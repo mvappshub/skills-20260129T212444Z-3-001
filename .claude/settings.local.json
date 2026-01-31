@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:open-meteo.com)",
+      "WebFetch(domain:api.meteoalarm.org)",
+      "Bash(npm install:*)",
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:openrouter.ai)"
+    ]
+  }
+}

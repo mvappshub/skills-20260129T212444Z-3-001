@@ -1,0 +1,8 @@
+{
+  "name": "SilvaPlan - Správa výsadby",
+  "description": "Logicky konzistentní nástroj pro správu stromů: Čas (kalendář) + Prostor (mapa) + Důkaz (fotky).",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
