@@ -31,12 +31,21 @@ import {
 import type { AIProvider } from './types';
 export type { AIProvider };
 
+export interface MessageAttachment {
+  type: 'image';
+  mimeType: string;
+  base64: string;
+  url?: string;
+  name?: string;
+}
+
 export interface Message {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   name?: string;
+  attachments?: MessageAttachment[];
 }
 
 interface ToolCall {
@@ -72,13 +81,31 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
       model: modelId,
       messages: [
         { role: 'system', content: systemPrompt },
-        ...messages.map(m => ({
-          role: m.role,
-          content: m.content,
-          ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
-          ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
-          ...(m.name ? { name: m.name } : {})
-        }))
+        ...messages.map(m => {
+          // For messages with images, use content array format
+          if (m.role === 'user' && m.attachments?.length) {
+            const contentParts: any[] = [{ type: 'text', text: m.content }];
+            for (const attachment of m.attachments) {
+              if (attachment.type === 'image' && attachment.base64) {
+                contentParts.push({
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${attachment.mimeType};base64,${attachment.base64}`
+                  }
+                });
+              }
+            }
+            return { role: m.role, content: contentParts };
+          }
+
+          return {
+            role: m.role,
+            content: m.content,
+            ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+            ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
+            ...(m.name ? { name: m.name } : {})
+          };
+        })
       ],
       tools,
       tool_choice: 'auto'
@@ -105,10 +132,23 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
       // Add conversation history
       for (const msg of messages) {
         if (msg.role === 'user') {
-          contents.push({
-            role: 'user',
-            parts: [{ text: msg.content }]
-          });
+          const parts: any[] = [{ text: msg.content }];
+
+          // Add image attachments for vision
+          if (msg.attachments?.length) {
+            for (const attachment of msg.attachments) {
+              if (attachment.type === 'image' && attachment.base64) {
+                parts.push({
+                  inlineData: {
+                    mimeType: attachment.mimeType,
+                    data: attachment.base64
+                  }
+                });
+              }
+            }
+          }
+
+          contents.push({ role: 'user', parts });
         } else if (msg.role === 'assistant') {
           const parts: any[] = [];
           if (msg.content) {

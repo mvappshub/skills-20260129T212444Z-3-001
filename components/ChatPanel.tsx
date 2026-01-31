@@ -8,13 +8,14 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Loader2, AlertCircle, X, MessageSquare, Settings, History, Plus, Trash2 } from 'lucide-react';
-import { chat, Message, ChatResponse, isAIConfigured } from '../services/ai/chatService';
+import { Send, Bot, Loader2, AlertCircle, X, MessageSquare, Settings, History, Plus, Trash2, Paperclip, Image as ImageIcon } from 'lucide-react';
+import { chat, Message, ChatResponse, isAIConfigured, MessageAttachment } from '../services/ai/chatService';
 import { ChatMessage } from './ChatMessage';
 import { SettingsModal } from './SettingsModal';
 import { ConversationHistory } from './ConversationHistory';
 import { useConversation } from '../hooks/useConversation';
 import { logAgentAction, deleteConversation } from '../services/conversationService';
+import { uploadFile, isImageFile, fileToBase64, type UploadedFile } from '../services/fileUploadService';
 
 interface ChatPanelProps {
   onEventCreated?: () => void;
@@ -49,8 +50,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -85,9 +89,55 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
+  // File upload handler
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+
+    setIsUploading(true);
+    setError(null);
+
+    try {
+      const fileArray = Array.from(files) as File[];
+      for (const file of fileArray) {
+        // Validate file type
+        if (!isImageFile(file.type)) {
+          setError('Pouze obrázky jsou podporovány (JPEG, PNG, GIF, WebP)');
+          continue;
+        }
+
+        // Convert to base64 for AI
+        const base64 = await fileToBase64(file);
+
+        const attachment: MessageAttachment = {
+          type: 'image',
+          mimeType: file.type,
+          base64,
+          name: file.name
+        };
+
+        setPendingAttachments(prev => [...prev, attachment]);
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      setError('Nepodařilo se nahrát soubor');
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Remove pending attachment
+  const removeAttachment = (index: number) => {
+    setPendingAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && pendingAttachments.length === 0) || isLoading) return;
 
     // Check if configured
     if (!isAIConfigured()) {
@@ -97,9 +147,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       return;
     }
 
-    const userMessage: Message = { role: 'user', content: input.trim() };
-    const userContent = input.trim();
+    const userMessage: Message = {
+      role: 'user',
+      content: input.trim() || 'Analyzuj tento obrázek',
+      attachments: pendingAttachments.length > 0 ? pendingAttachments : undefined
+    };
+    const userContent = input.trim() || 'Analyzuj tento obrázek';
     setInput('');
+    setPendingAttachments([]);
     setError(null);
     setIsLoading(true);
 
@@ -335,19 +390,69 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         {/* Input */}
         <form onSubmit={handleSubmit} className="p-4 border-t border-slate-200">
+          {/* Pending Attachments Preview */}
+          {pendingAttachments.length > 0 && (
+            <div className="flex gap-2 mb-3 flex-wrap">
+              {pendingAttachments.map((attachment, index) => (
+                <div
+                  key={index}
+                  className="relative group w-16 h-16 rounded-lg overflow-hidden border border-slate-200"
+                >
+                  <img
+                    src={`data:${attachment.mimeType};base64,${attachment.base64}`}
+                    alt={attachment.name || 'Příloha'}
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(index)}
+                    className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            multiple
+            onChange={handleFileChange}
+            className="hidden"
+          />
+
           <div className="flex gap-2">
+            {/* Upload button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading || isUploading || !configured}
+              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Přidat obrázek"
+            >
+              {isUploading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <ImageIcon className="w-5 h-5" />
+              )}
+            </button>
+
             <input
               ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={!configured ? "Nejprve nastavte API klíč..." : "Napiš zprávu..."}
+              placeholder={!configured ? "Nejprve nastavte API klíč..." : pendingAttachments.length > 0 ? "Přidej popis..." : "Napiš zprávu..."}
               className="flex-1 px-4 py-2 border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
               disabled={isLoading || !configured}
             />
             <button
               type="submit"
-              disabled={!input.trim() || isLoading || !configured}
+              disabled={(!input.trim() && pendingAttachments.length === 0) || isLoading || !configured}
               className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Send className="w-5 h-5" />
