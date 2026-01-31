@@ -12,7 +12,7 @@ import {
   isWithinInterval
 } from 'date-fns';
 import { cs } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar, Map as MapIcon, Menu, AlertTriangle, Plus, History } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Map as MapIcon, Menu, AlertTriangle, Plus, History, Bell } from 'lucide-react';
 import { MapCanvas } from './components/MapCanvas';
 import { DayDetailPanel } from './components/DayDetailPanel';
 import { HistorySidebar } from './components/HistorySidebar';
@@ -20,7 +20,9 @@ import { PlanModal } from './components/PlanModal';
 import { ChatPanel, ChatButton } from './components/ChatPanel';
 import { SettingsModal } from './components/SettingsModal';
 import { RiskBanner } from './components/RiskBanner';
+import { NotificationPanel, NotificationBell } from './components/NotificationPanel';
 import { useProactiveRiskCheck } from './hooks/useProactiveRiskCheck';
+import { useNotifications } from './hooks/useNotifications';
 import { fetchEvents, createEvent } from './services/eventService';
 import { fetchTrees } from './services/treeService';
 import { fetchAlerts } from './services/alertService';
@@ -79,11 +81,22 @@ export default function App() {
   // --- Chat State ---
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   // --- Proactive Risk Check ---
   const { warnings: riskWarnings } = useProactiveRiskCheck(true);
   const [dismissedWarnings, setDismissedWarnings] = useState<string[]>([]);
   const activeWarnings = riskWarnings.filter(w => !dismissedWarnings.includes(w.eventId));
+
+  // --- Notifications ---
+  const {
+    notifications,
+    unreadCount,
+    markRead,
+    markAllRead,
+    dismiss: dismissNotification,
+    checkForAlerts
+  } = useNotifications();
 
   // Default location (Praha)
   const DEFAULT_LAT = 50.0755;
@@ -344,34 +357,38 @@ export default function App() {
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
             <button
               onClick={() => setViewMode('calendar')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'calendar'
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${viewMode === 'calendar'
                   ? 'bg-white text-emerald-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-800'
-              }`}
+                }`}
             >
               Kalendář
             </button>
             <button
               onClick={() => setViewMode('map')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'map'
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${viewMode === 'map'
                   ? 'bg-white text-emerald-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-800'
-              }`}
+                }`}
             >
               Mapa
             </button>
           </div>
         </div>
 
-        <button
-          onClick={handleOpenPlanModal}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium shadow hover:bg-emerald-700 transition-colors"
-        >
-          <Plus size={18} />
-          <span className="hidden sm:inline">Nová akce</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationBell
+            unreadCount={unreadCount}
+            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+          />
+          <button
+            onClick={handleOpenPlanModal}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium shadow hover:bg-emerald-700 transition-colors"
+          >
+            <Plus size={18} />
+            <span className="hidden sm:inline">Nová akce</span>
+          </button>
+        </div>
       </header>
 
       {/* Main content */}
@@ -555,6 +572,17 @@ export default function App() {
           onClose={() => setIsSettingsOpen(false)}
         />
       )}
+
+      {/* Notification Panel */}
+      <NotificationPanel
+        notifications={notifications}
+        unreadCount={unreadCount}
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        onMarkRead={markRead}
+        onMarkAllRead={markAllRead}
+        onDismiss={dismissNotification}
+      />
 
     </div>
   );
