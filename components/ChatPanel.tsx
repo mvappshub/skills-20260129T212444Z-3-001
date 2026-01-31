@@ -4,13 +4,16 @@
  *
  * Provides conversational interface for AI assistant with tool calling support.
  * API keys are managed via settings modal (localStorage).
+ * Conversations are persisted to Supabase.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Loader2, AlertCircle, X, MessageSquare, Settings } from 'lucide-react';
+import { Send, Bot, Loader2, AlertCircle, X, MessageSquare, Settings, History, Plus, Trash2 } from 'lucide-react';
 import { chat, Message, ChatResponse, isAIConfigured } from '../services/ai/chatService';
 import { ChatMessage } from './ChatMessage';
 import { SettingsModal } from './SettingsModal';
+import { useConversation } from '../hooks/useConversation';
+import { logAgentAction } from '../services/conversationService';
 
 interface ChatPanelProps {
   onEventCreated?: () => void;
@@ -25,11 +28,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onClose,
   onOpenSettings
 }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Conversation persistence hook
+  const {
+    conversations,
+    currentConversationId,
+    messages,
+    startNewConversation,
+    loadConversation,
+    addUserMessage,
+    addAssistantMessage,
+    addToolMessage,
+    logAction,
+    deleteCurrentConversation,
+    refreshConversations
+  } = useConversation();
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -79,17 +97,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
 
     const userMessage: Message = { role: 'user', content: input.trim() };
-    setMessages(prev => [...prev, userMessage]);
+    const userContent = input.trim();
     setInput('');
     setError(null);
     setIsLoading(true);
 
     try {
+      // Save user message to DB
+      await addUserMessage(userContent);
+
       const allMessages = [...messages, userMessage];
       let response: ChatResponse = await chat(allMessages);
 
-      // Add assistant message
-      setMessages(prev => [...prev, response.message]);
+      // Save assistant response to DB
+      await addAssistantMessage(response.message.content, response.message.tool_calls);
 
       // If tools were called, continue the conversation
       if (response.toolResults && response.toolResults.length > 0) {
@@ -101,19 +122,30 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           onEventCreated();
         }
 
+        // Log tool actions
+        for (const tr of response.toolResults) {
+          await logAction(tr.name, tr.result, tr.result, tr.result?.success !== false);
+        }
+
         // Add tool results as messages and get final response
-        const toolMessages: Message[] = response.message.tool_calls!.map((tc, i) => ({
-          role: 'tool' as const,
-          tool_call_id: tc.id,
-          name: tc.function.name,
-          content: JSON.stringify(response.toolResults![i].result)
-        }));
+        const toolMessages: Message[] = response.message.tool_calls!.map((tc, i) => {
+          const msg: Message = {
+            role: 'tool' as const,
+            tool_call_id: tc.id,
+            name: tc.function.name,
+            content: JSON.stringify(response.toolResults![i].result)
+          };
+          // Save tool message to DB
+          addToolMessage(msg.content, tc.id);
+          return msg;
+        });
 
         const finalResponse = await chat(
           [...allMessages, response.message, ...toolMessages]
         );
 
-        setMessages(prev => [...prev, finalResponse.message]);
+        // Save final assistant response to DB
+        await addAssistantMessage(finalResponse.message.content, finalResponse.message.tool_calls);
 
         // Handle nested tool calls if any
         if (finalResponse.toolResults && finalResponse.toolResults.length > 0) {
@@ -122,6 +154,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           );
           if (nestedEventModified && onEventCreated) {
             onEventCreated();
+          }
+          // Log nested tool actions
+          for (const tr of finalResponse.toolResults) {
+            await logAction(tr.name, tr.result, tr.result, tr.result?.success !== false);
           }
         }
       }
@@ -138,9 +174,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     inputRef.current?.focus();
   };
 
-  const handleClearChat = () => {
-    setMessages([]);
+  const handleClearChat = async () => {
+    await deleteCurrentConversation();
     setError(null);
+  };
+
+  const handleNewChat = async () => {
+    await startNewConversation();
+    setShowHistory(false);
+  };
+
+  const handleLoadConversation = async (id: string) => {
+    await loadConversation(id);
+    setShowHistory(false);
   };
 
   if (!isOpen) return null;
