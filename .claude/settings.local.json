@@ -6,7 +6,8 @@
       "WebFetch(domain:api.meteoalarm.org)",
       "Bash(npm install:*)",
       "WebFetch(domain:ai.google.dev)",
-      "WebFetch(domain:openrouter.ai)"
+      "WebFetch(domain:openrouter.ai)",
+      "Bash(npm run build:*)"
     ]
   }
 }

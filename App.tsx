@@ -17,6 +17,10 @@ import { MapCanvas } from './components/MapCanvas';
 import { DayDetailPanel } from './components/DayDetailPanel';
 import { HistorySidebar } from './components/HistorySidebar';
 import { PlanModal } from './components/PlanModal';
+import { ChatPanel, ChatButton } from './components/ChatPanel';
+import { SettingsModal } from './components/SettingsModal';
+import { RiskBanner } from './components/RiskBanner';
+import { useProactiveRiskCheck } from './hooks/useProactiveRiskCheck';
 import { fetchEvents, createEvent } from './services/eventService';
 import { fetchTrees } from './services/treeService';
 import { fetchAlerts } from './services/alertService';
@@ -71,6 +75,15 @@ export default function App() {
   const [isPickingLocation, setIsPickingLocation] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [focusLocation, setFocusLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+
+  // --- Chat State ---
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // --- Proactive Risk Check ---
+  const { warnings: riskWarnings } = useProactiveRiskCheck(true);
+  const [dismissedWarnings, setDismissedWarnings] = useState<string[]>([]);
+  const activeWarnings = riskWarnings.filter(w => !dismissedWarnings.includes(w.eventId));
 
   // Default location (Praha)
   const DEFAULT_LAT = 50.0755;
@@ -274,6 +287,20 @@ export default function App() {
     }
   };
 
+  // Refresh events after AI creates/modifies event
+  const handleAIEventChange = async () => {
+    try {
+      const [eventsData, alertsData] = await Promise.all([
+        fetchEvents(),
+        fetchAlerts(DEFAULT_LAT, DEFAULT_LNG)
+      ]);
+      setEvents(eventsData);
+      setAlerts(alertsData);
+    } catch (err) {
+      console.error('Failed to refresh events:', err);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -298,6 +325,13 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-full flex-col text-slate-900 font-sans">
+
+      {/* Risk Warning Banner */}
+      <RiskBanner
+        warnings={activeWarnings}
+        onDismiss={(id) => setDismissedWarnings(prev => [...prev, id])}
+        onOpenChat={() => setIsChatOpen(true)}
+      />
 
       {/* Header with tabs */}
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
@@ -499,6 +533,28 @@ export default function App() {
         initialDate={selectedDate}
         pickedLocation={pickedLocation}
       />
+
+      {/* AI Chat Assistant */}
+      <ChatPanel
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        onEventCreated={handleAIEventChange}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
+      {!isChatOpen && (
+        <ChatButton
+          onClick={() => setIsChatOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+        />
+      )}
+
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+        />
+      )}
 
     </div>
   );
