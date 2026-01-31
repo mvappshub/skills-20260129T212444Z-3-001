@@ -12,8 +12,9 @@ import { Send, Bot, Loader2, AlertCircle, X, MessageSquare, Settings, History, P
 import { chat, Message, ChatResponse, isAIConfigured } from '../services/ai/chatService';
 import { ChatMessage } from './ChatMessage';
 import { SettingsModal } from './SettingsModal';
+import { ConversationHistory } from './ConversationHistory';
 import { useConversation } from '../hooks/useConversation';
-import { logAgentAction } from '../services/conversationService';
+import { logAgentAction, deleteConversation } from '../services/conversationService';
 
 interface ChatPanelProps {
   onEventCreated?: () => void;
@@ -207,6 +208,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
           <div className="flex items-center gap-1">
             <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={`p-1.5 hover:bg-white/20 rounded-lg transition-colors ${showHistory ? 'bg-white/20' : ''}`}
+              title="Historie konverzací"
+            >
+              <History className="w-4 h-4" />
+            </button>
+            <button
               onClick={handleOpenSettings}
               className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
               title="Nastavení AI"
@@ -347,6 +355,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Conversation History Sidebar */}
+      <ConversationHistory
+        conversations={conversations}
+        currentId={currentConversationId}
+        onSelect={handleLoadConversation}
+        onNew={handleNewChat}
+        onDelete={async (id) => {
+          await deleteConversation(id);
+          if (id === currentConversationId) {
+            await startNewConversation();
+          }
+          await refreshConversations();
+        }}
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+      />
 
       {/* Settings Modal */}
       <SettingsModal isOpen={showSettings} onClose={handleCloseSettings} />
