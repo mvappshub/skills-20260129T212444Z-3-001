@@ -247,31 +247,43 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
 
 const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
   async createEvent(args) {
-    const event = await createEvent({
-      title: args.title,
-      type: args.type as EventType,
-      status: EventStatus.PLANNED,
-      start_at: parseISO(args.date),
-      lat: args.lat || 50.0755,
-      lng: args.lng || 14.4378,
-      notes: args.notes,
-      items: (args.items || []).map((item: any) => ({
-        id: crypto.randomUUID(),
-        species_name_latin: item.species,
-        quantity: item.quantity,
-        size_class: item.sizeClass
-      }))
-    });
-    return {
-      success: true,
-      event: {
-        id: event.id,
-        title: event.title,
-        date: format(event.start_at, 'd.M.yyyy'),
-        type: event.type
-      },
-      message: `Akce "${event.title}" byla vytvořena na ${format(event.start_at, 'd.M.yyyy')}`
-    };
+    try {
+      console.log('[ChatService] createEvent called with:', args);
+      const event = await createEvent({
+        title: args.title,
+        type: args.type as EventType,
+        status: EventStatus.PLANNED,
+        start_at: parseISO(args.date),
+        lat: args.lat || 50.0755,
+        lng: args.lng || 14.4378,
+        notes: args.notes,
+        items: (args.items || []).map((item: any) => ({
+          id: crypto.randomUUID(),
+          species_name_latin: item.species,
+          quantity: item.quantity,
+          size_class: item.sizeClass
+        }))
+      });
+      console.log('[ChatService] createEvent success:', event.id);
+      return {
+        success: true,
+        event: {
+          id: event.id,
+          title: event.title,
+          date: format(event.start_at, 'd.M.yyyy'),
+          type: event.type
+        },
+        message: `Akce "${event.title}" byla vytvořena na ${format(event.start_at, 'd.M.yyyy')}`
+      };
+    } catch (error) {
+      console.error('[ChatService] createEvent error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        error: errorMessage,
+        message: `Nepodařilo se vytvořit akci: ${errorMessage}`
+      };
+    }
   },
 
   async editEvent(args) {

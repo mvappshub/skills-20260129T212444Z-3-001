@@ -172,12 +172,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       return;
     }
 
+    // Determine default content based on attachments
+    const hasImages = pendingAttachments.some(a => a.type === 'image');
+    const hasDocs = pendingAttachments.some(a => a.type === 'document');
+    let defaultContent = '';
+    if (pendingAttachments.length > 0 && !input.trim()) {
+      if (hasDocs && !hasImages) {
+        defaultContent = 'Analyzuj přiložený dokument';
+      } else if (hasImages && !hasDocs) {
+        defaultContent = 'Analyzuj přiložený obrázek';
+      } else {
+        defaultContent = 'Analyzuj přiložené soubory';
+      }
+    }
+
     const userMessage: Message = {
       role: 'user',
-      content: input.trim() || 'Analyzuj tento obrázek',
+      content: input.trim() || defaultContent,
       attachments: pendingAttachments.length > 0 ? pendingAttachments : undefined
     };
-    const userContent = input.trim() || 'Analyzuj tento obrázek';
+    const userContent = input.trim() || defaultContent;
     setInput('');
     setPendingAttachments([]);
     setError(null);
