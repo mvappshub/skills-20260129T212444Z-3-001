@@ -16,6 +16,8 @@ import { ConversationHistory } from './ConversationHistory';
 import { useConversation } from '../hooks/useConversation';
 import { logAgentAction, deleteConversation } from '../services/conversationService';
 import { isImageFile, isDocumentFile, isTextReadable, fileToBase64, fileToText, isAllowedFileType, getFileExtension } from '../services/fileUploadService';
+import { extractTextFromPDF, isPDF } from '../services/pdfService';
+import { extractTextFromDocx, isDocx, isDoc } from '../services/docxService';
 
 interface ChatPanelProps {
   onEventCreated?: () => void;
@@ -117,6 +119,38 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             base64,
             name: file.name
           };
+        } else if (isPDF(file.type)) {
+          // Handle PDF files - extract text using pdf.js
+          try {
+            const textContent = await extractTextFromPDF(file);
+            attachment = {
+              type: 'document',
+              mimeType: file.type,
+              textContent,
+              name: file.name
+            };
+          } catch (err) {
+            setError(`Nepodařilo se přečíst PDF "${file.name}": ${err instanceof Error ? err.message : 'neznámá chyba'}`);
+            continue;
+          }
+        } else if (isDocx(file.type)) {
+          // Handle Word documents (.docx) - extract text using mammoth
+          try {
+            const textContent = await extractTextFromDocx(file);
+            attachment = {
+              type: 'document',
+              mimeType: file.type,
+              textContent,
+              name: file.name
+            };
+          } catch (err) {
+            setError(`Nepodařilo se přečíst Word dokument "${file.name}": ${err instanceof Error ? err.message : 'neznámá chyba'}`);
+            continue;
+          }
+        } else if (isDoc(file.type)) {
+          // Old .doc format - not supported by mammoth
+          setError(`Starý formát Word (.doc) není podporován. Prosím uložte dokument "${file.name}" jako .docx`);
+          continue;
         } else if (isTextReadable(file.type)) {
           // Handle text-based files - read content directly
           const textContent = await fileToText(file);
@@ -127,18 +161,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             name: file.name
           };
         } else {
-          // Handle binary documents (PDF, Word, Excel, etc.)
-          // For now, we'll notify the user that we can only read text files
-          // In a production app, you'd use a library like pdf.js or mammoth.js
-          setError(`Soubor "${file.name}" byl přidán, ale binární formáty (PDF, Word, Excel) zatím nelze přímo číst. Pro plnou podporu použijte textové soubory (.txt, .csv, .json, .md).`);
-
-          // Still add it but with a placeholder
-          attachment = {
-            type: 'document',
-            mimeType: file.type,
-            textContent: `[Binární soubor: ${file.name} (${(file.size / 1024).toFixed(1)} KB) - obsah nelze přímo přečíst]`,
-            name: file.name
-          };
+          // Handle other binary documents (Excel, etc.)
+          setError(`Soubor "${file.name}" má nepodporovaný formát pro přímé čtení. Podporované formáty: obrázky, PDF, Word (.docx), a textové soubory.`);
+          continue;
         }
 
         setPendingAttachments(prev => [...prev, attachment]);
