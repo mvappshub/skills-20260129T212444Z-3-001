@@ -23,7 +23,7 @@ import { RiskBanner } from './components/RiskBanner';
 import { NotificationPanel, NotificationBell } from './components/NotificationPanel';
 import { useProactiveRiskCheck } from './hooks/useProactiveRiskCheck';
 import { useNotifications } from './hooks/useNotifications';
-import { fetchEvents, createEvent } from './services/eventService';
+import { fetchEvents, createEvent, deleteEvent as deleteEventFn } from './services/eventService';
 import { fetchTrees } from './services/treeService';
 import { fetchAlerts } from './services/alertService';
 import { reverseGeocode } from './services/geocodingService';
@@ -332,6 +332,24 @@ export default function App() {
     }
   };
 
+  const handleDeleteEvent = async (id: string) => {
+    const event = events.find(e => e.id === id);
+    const name = event?.title || 'tuto akci';
+    if (!window.confirm(`Opravdu chcete smazat ${name}?`)) return;
+
+    try {
+      await deleteEventFn(id);
+      setEvents(prev => prev.filter(e => e.id !== id));
+      if (selectedEventId === id) {
+        setSelectedEventId(null);
+        setSelectedItemId(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete event:', err);
+      alert('Nepodařilo se smazat akci. Zkuste to znovu.');
+    }
+  };
+
   const handleSidebarItemClick = (item: { type: 'event' | 'tree'; id: string }) => {
     setSelectedItemId(item.id);
     // For history sidebar - set the appropriate selected ID
@@ -568,6 +586,7 @@ export default function App() {
               selectedEventId={selectedEventId}
               onEventSelect={(id) => setSelectedEventId(id)}
               onEventClose={() => setSelectedEventId(null)}
+              onDeleteEvent={handleDeleteEvent}
             />
           )}
 
@@ -588,6 +607,7 @@ export default function App() {
                   weatherLoading={weatherLoading}
                   onFocusMap={handleMapFocus}
                   onPlanClick={handleOpenPlanModal}
+                  onDeleteEvent={handleDeleteEvent}
                 />
               </div>
             </div>

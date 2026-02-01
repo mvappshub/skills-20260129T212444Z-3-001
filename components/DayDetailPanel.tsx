@@ -11,7 +11,8 @@ import {
   Leaf,
   Droplets,
   Thermometer,
-  CloudSun
+  CloudSun,
+  Trash2
 } from 'lucide-react';
 import { WeatherCard } from './WeatherCard';
 import { ForecastRow } from './ForecastRow';
@@ -27,6 +28,7 @@ interface DayDetailPanelProps {
   weatherLoading?: boolean;
   onFocusMap: (lat: number, lng: number) => void;
   onPlanClick: () => void;
+  onDeleteEvent?: (id: string) => void;
 }
 
 export const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
@@ -38,7 +40,8 @@ export const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
   forecast,
   weatherLoading,
   onFocusMap,
-  onPlanClick
+  onPlanClick,
+  onDeleteEvent
 }) => {
   const formattedDate = format(date, 'd. MMMM yyyy', { locale: cs });
   const dayName = format(date, 'EEEE', { locale: cs });
@@ -156,7 +159,17 @@ export const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
                       </span>
                       <h4 className="font-medium text-slate-800">{event.title}</h4>
                     </div>
-                    <MapPin className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onDeleteEvent?.(event.id); }}
+                        className="p-1 rounded hover:bg-red-50 text-red-600 hover:text-red-700"
+                        title="Smazat pl?n"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <MapPin className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                    </div>
                   </div>
                   
                   {event.items.length > 0 && (

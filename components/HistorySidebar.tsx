@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { format, isSameDay, isPast, isFuture } from 'date-fns'
 import { cs } from 'date-fns/locale'
 import { CalendarEvent, TreeRecord, EventType, TreePhoto } from '../types'
-import { Leaf, MapPin, Calendar as CalendarIcon, ChevronDown, ChevronRight, ArrowLeft, Loader2 } from 'lucide-react'
+import { Leaf, MapPin, Calendar as CalendarIcon, ChevronDown, ChevronRight, ArrowLeft, Loader2, Trash2 } from 'lucide-react'
 import { PhotoCapture } from './PhotoCapture'
 import { PhotoGallery } from './PhotoGallery'
 import { uploadAndSavePhoto } from '../services/storageService'
@@ -19,6 +19,7 @@ interface HistorySidebarProps {
   selectedEventId?: string | null // Controlled from parent
   onEventSelect?: (id: string) => void // Notify parent when event is selected
   onEventClose?: () => void // Notify parent when event detail is closed
+  onDeleteEvent?: (id: string) => void
 }
 
 // Combine events and trees into chronological list
@@ -47,6 +48,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
   selectedEventId: propSelectedEventId,
   onEventSelect,
   onEventClose,
+  onDeleteEvent,
 }) => {
   const [filter, setFilter] = useState<'all' | 'trees' | 'events'>('all')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
