@@ -445,6 +445,70 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
     }
   },
 
+  async editEvents(args) {
+    try {
+      const allEvents = await fetchEvents();
+      let filtered = allEvents;
+
+      if (args.startDate) {
+        const start = parseISO(args.startDate);
+        filtered = filtered.filter(e => e.start_at >= start);
+      }
+      if (args.endDate) {
+        const end = parseISO(args.endDate);
+        filtered = filtered.filter(e => e.start_at <= end);
+      }
+      if (args.type) {
+        filtered = filtered.filter(e => e.type === args.type);
+      }
+      if (args.status) {
+        filtered = filtered.filter(e => e.status === args.status);
+      }
+      if (args.titleContains) {
+        const needle = args.titleContains.toLowerCase();
+        filtered = filtered.filter(e => e.title.toLowerCase().includes(needle));
+      }
+      if (args.missingAddress) {
+        filtered = filtered.filter(e => !e.address || e.address.trim() === '');
+      }
+
+      const maxCount = args.maxCount ?? 50;
+      const toEdit = filtered.slice(0, maxCount);
+
+      let updated = 0;
+      for (const ev of toEdit) {
+        const updates = {};
+        if (args.setStatus) updates['status'] = args.setStatus;
+        if (args.setDate) {
+          const d = parseISO(args.setDate);
+          updates['start_at'] = d;
+        }
+        if (args.shiftDays) {
+          const shifted = new Date(ev.start_at.getTime());
+          shifted.setDate(shifted.getDate() + args.shiftDays);
+          updates['start_at'] = shifted;
+        }
+        if (args.appendTitle) {
+          updates['title'] = `${ev.title} ${args.appendTitle}`.trim();
+        }
+
+        if (Object.keys(updates).length === 0) continue;
+        await updateEvent(ev.id, updates);
+        updated += 1;
+      }
+
+      return {
+        success: true,
+        message: `Upraveno ${updated} akc?.`
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Nepoda?ilo se upravit akce: ${error}`
+      };
+    }
+  },
+
   async getEvents(args) {
     const events = await fetchEvents();
     let filtered = events;

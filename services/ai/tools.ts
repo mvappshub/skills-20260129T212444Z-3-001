@@ -44,6 +44,28 @@ export const deleteEventsSchema = z.object({
   message: 'Mus?? zadat alespo? jeden filtr'
 });
 
+export const editEventsSchema = z.object({
+  startDate: z.string().optional().describe('Po??te?n? datum filtru YYYY-MM-DD'),
+  endDate: z.string().optional().describe('Koncov? datum filtru YYYY-MM-DD'),
+  type: z.enum(['planting', 'maintenance', 'other']).optional().describe('Filtr dle typu'),
+  status: z.enum(['planned', 'done', 'canceled']).optional().describe('Filtr dle stavu'),
+  titleContains: z.string().optional().describe('??st n?zvu akce'),
+  missingAddress: z.boolean().optional().describe('Filtrovat jen akce bez adresy'),
+  maxCount: z.number().int().positive().max(200).optional().describe('Max po?et upraven?ch z?znam? (ochrana)')
+}).refine(data => Boolean(data.startDate || data.endDate || data.type || data.status || data.titleContains || data.missingAddress), {
+  message: 'Mus?? zadat alespo? jeden filtr'
+}).and(
+  z.object({
+    setStatus: z.enum(['planned', 'done', 'canceled']).optional().describe('Nov? stav'),
+    shiftDays: z.number().int().optional().describe('Posun data o X dn?'),
+    setDate: z.string().optional().describe('Nastavit datum YYYY-MM-DD'),
+    appendTitle: z.string().optional().describe('P?idat text do n?zvu')
+  }).refine(data => Boolean(data.setStatus || data.shiftDays || data.setDate || data.appendTitle), {
+    message: 'Mus?? zadat alespo? jednu zm?nu'
+  })
+);
+
+
 export const getEventsSchema = z.object({
   startDate: z.string().optional().describe('Počáteční datum filtru YYYY-MM-DD'),
   endDate: z.string().optional().describe('Koncové datum filtru YYYY-MM-DD'),
@@ -87,6 +109,10 @@ export const toolDefinitions = {
   deleteEvents: {
     description: 'Hromadn? smazat akce podle filtru (nap?. datum, typ, stav, chyb?j?c? adresa). Pou?ij pouze p?i explicitn?m po?adavku u?ivatele.',
     parameters: deleteEventsSchema
+  },
+  editEvents: {
+    description: 'Hromadn? upravit akce podle filtru (nap?. posun data, zm?na stavu). Pou?ij pouze p?i explicitn?m po?adavku u?ivatele.',
+    parameters: editEventsSchema
   },
   getEvents: {
     description: 'Získat seznam akcí z kalendáře. Použij pro zobrazení plánu nebo hledání konkrétních akcí.',
