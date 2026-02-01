@@ -38,6 +38,11 @@ export interface AISettings {
   // User preferences
   streamResponses: boolean;
   maxHistoryMessages: number;
+
+  // Default location
+  defaultLat: number;
+  defaultLng: number;
+  defaultLocationName: string;
 }
 
 export interface GeminiModelInfo {
@@ -62,7 +67,10 @@ const DEFAULT_SETTINGS: AISettings = {
   openrouterModelId: 'google/gemini-3-flash-preview',
   geminiModelId: 'gemini-2.5-flash',
   streamResponses: false,
-  maxHistoryMessages: 50
+  maxHistoryMessages: 50,
+  defaultLat: 50.0755,
+  defaultLng: 14.4378,
+  defaultLocationName: 'Praha',
 };
 
 // Gemini 2.5 Flash is the stable model (Gemini 2.0 Flash is deprecated March 2026)
@@ -150,7 +158,10 @@ export function getSettings(): AISettings {
         openrouterModelId: parsed.openrouterModelId ?? DEFAULT_SETTINGS.openrouterModelId,
         geminiModelId: parsed.geminiModelId ?? DEFAULT_SETTINGS.geminiModelId,
         streamResponses: parsed.streamResponses ?? DEFAULT_SETTINGS.streamResponses,
-        maxHistoryMessages: parsed.maxHistoryMessages ?? DEFAULT_SETTINGS.maxHistoryMessages
+        maxHistoryMessages: parsed.maxHistoryMessages ?? DEFAULT_SETTINGS.maxHistoryMessages,
+        defaultLat: parsed.defaultLat ?? DEFAULT_SETTINGS.defaultLat,
+        defaultLng: parsed.defaultLng ?? DEFAULT_SETTINGS.defaultLng,
+        defaultLocationName: parsed.defaultLocationName ?? DEFAULT_SETTINGS.defaultLocationName,
       };
     }
   } catch (error) {
@@ -388,4 +399,16 @@ export function onSettingsChanged(callback: (settings: AISettings) => void): () 
   const handler = (e: CustomEvent<AISettings>) => callback(e.detail);
   window.addEventListener('aisettings-changed', handler as EventListener);
   return () => window.removeEventListener('aisettings-changed', handler as EventListener);
+}
+
+/**
+ * Get default location settings
+ */
+export function getDefaultLocation(): { lat: number; lng: number; name: string } {
+  const settings = getSettings();
+  return {
+    lat: settings.defaultLat,
+    lng: settings.defaultLng,
+    name: settings.defaultLocationName
+  };
 }

@@ -19,6 +19,7 @@ import { format, parseISO, addDays, isWithinInterval } from 'date-fns';
 import {
   getProviderConfig,
   getActiveApiKey,
+  getDefaultLocation,
   type OpenRouterModel,
   GEMINI_MODELS
 } from '../settingsService';
@@ -296,13 +297,14 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
       debugLog('[ChatService] createEvent called with:', args);
       // Default to 'planting' if type not provided by AI
       const eventType = (args.type as EventType) || EventType.PLANTING;
+      const defaultLoc = getDefaultLocation();
       const event = await createEvent({
         title: args.title,
         type: eventType,
         status: EventStatus.PLANNED,
         start_at: parseISO(args.date),
-        lat: args.lat || 50.0755,
-        lng: args.lng || 14.4378,
+        lat: args.lat || defaultLoc.lat,
+        lng: args.lng || defaultLoc.lng,
         notes: args.notes,
         items: (args.items || []).map((item: any) => ({
           id: crypto.randomUUID(),
@@ -405,8 +407,9 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
   },
 
   async getWeather(args) {
-    const lat = args.lat || 50.0755;
-    const lng = args.lng || 14.4378;
+    const defaultLoc = getDefaultLocation();
+    const lat = args.lat || defaultLoc.lat;
+    const lng = args.lng || defaultLoc.lng;
     const days = args.days || 7;
 
     const [current, forecast] = await Promise.all([
@@ -447,10 +450,11 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
 
   async analyzeRisks(args) {
     try {
+      const defaultLoc = getDefaultLocation();
       const [events, alerts, forecast] = await Promise.all([
         fetchEvents(),
         fetchAlerts(),
-        fetchWeatherForecast(50.0755, 14.4378, 14)
+        fetchWeatherForecast(defaultLoc.lat, defaultLoc.lng, 14)
       ]);
 
       const upcomingEvents = events.filter(e =>
@@ -533,9 +537,10 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
   },
 
   async suggestPlantingDate(args) {
+    const defaultLoc = getDefaultLocation();
     const forecast = await fetchWeatherForecast(
-      args.lat || 50.0755,
-      args.lng || 14.4378,
+      args.lat || defaultLoc.lat,
+      args.lng || defaultLoc.lng,
       14
     );
 
@@ -599,6 +604,7 @@ async function executeTool(name: ToolName, args: any): Promise<any> {
 // ============================================================================
 
 function getSystemPrompt(): string {
+  const defaultLoc = getDefaultLocation();
   return `Jsi SilvaPlan AI - inteligentní asistent pro správu výsadby a péči o stromy.
 
 TVOJE SCHOPNOSTI:
@@ -636,7 +642,7 @@ LATINSKÉ NÁZVY BĚŽNÝCH DRUHŮ:
 
 KONTEXT:
 - Aktuální datum: ${format(new Date(), 'd.M.yyyy')}
-- Výchozí lokace: Praha (50.0755, 14.4378)
+- Výchozí lokace: ${defaultLoc.name} (${defaultLoc.lat}, ${defaultLoc.lng})
 
 Odpovídej stručně. Když vidíš dokument s daty, IHNED vytvoř akce bez zbytečných otázek.`;
 }

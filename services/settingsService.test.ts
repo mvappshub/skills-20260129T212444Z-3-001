@@ -42,8 +42,12 @@ describe('settingsService', () => {
                 openrouterApiKey: 'sk-or-v1-test',
                 geminiApiKey: 'AIzaSyTest123',
                 openrouterModelId: 'google/gemini-2.5-flash',
+                geminiModelId: 'gemini-2.5-flash',
                 streamResponses: false,
-                maxHistoryMessages: 50
+                maxHistoryMessages: 50,
+                defaultLat: 50.0755,
+                defaultLng: 14.4378,
+                defaultLocationName: 'Praha'
             };
             localStorageMock.setItem('silvaplan_ai_settings', JSON.stringify(stored));
 
@@ -92,8 +96,12 @@ describe('settingsService', () => {
                 openrouterApiKey: 'sk-or-v1-testkey123456789',
                 geminiApiKey: '',
                 openrouterModelId: 'google/gemini-2.5-flash',
+                geminiModelId: 'gemini-2.5-flash',
                 streamResponses: false,
-                maxHistoryMessages: 50
+                maxHistoryMessages: 50,
+                defaultLat: 50.0755,
+                defaultLng: 14.4378,
+                defaultLocationName: 'Praha'
             };
             saveSettings(settings);
 
