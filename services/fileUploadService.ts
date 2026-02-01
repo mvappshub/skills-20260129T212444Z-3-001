@@ -7,9 +7,24 @@
 import { supabase } from '../lib/supabase';
 
 const BUCKET_NAME = 'chat-attachments';
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const ALLOWED_DOC_TYPES = ['application/pdf', 'text/plain', 'text/csv'];
+const ALLOWED_DOC_TYPES = [
+    'application/pdf',
+    'text/plain',
+    'text/csv',
+    'text/markdown',
+    'application/json',
+    // Microsoft Office
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+    'application/msword', // .doc
+    'application/vnd.ms-excel', // .xls
+    // OpenDocument
+    'application/vnd.oasis.opendocument.text', // .odt
+    'application/vnd.oasis.opendocument.spreadsheet', // .ods
+];
 
 export interface UploadedFile {
     id: string;
@@ -42,6 +57,20 @@ export function isImageFile(mimeType: string): boolean {
 }
 
 /**
+ * Check if file is a document
+ */
+export function isDocumentFile(mimeType: string): boolean {
+    return ALLOWED_DOC_TYPES.includes(mimeType);
+}
+
+/**
+ * Get file extension from name
+ */
+export function getFileExtension(filename: string): string {
+    return filename.split('.').pop()?.toLowerCase() || '';
+}
+
+/**
  * Convert File to base64 string
  */
 export async function fileToBase64(file: File): Promise<string> {
@@ -56,6 +85,33 @@ export async function fileToBase64(file: File): Promise<string> {
         };
         reader.onerror = error => reject(error);
     });
+}
+
+/**
+ * Read text content from a file
+ * For text-based files (txt, csv, json, md)
+ */
+export async function fileToText(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsText(file);
+        reader.onload = () => {
+            resolve(reader.result as string);
+        };
+        reader.onerror = error => reject(error);
+    });
+}
+
+/**
+ * Check if file can be read as text directly
+ */
+export function isTextReadable(mimeType: string): boolean {
+    return [
+        'text/plain',
+        'text/csv',
+        'text/markdown',
+        'application/json'
+    ].includes(mimeType);
 }
 
 /**

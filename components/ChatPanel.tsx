@@ -8,14 +8,14 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Loader2, AlertCircle, X, MessageSquare, Settings, History, Plus, Trash2, Paperclip, Image as ImageIcon } from 'lucide-react';
+import { Send, Bot, Loader2, AlertCircle, X, MessageSquare, Settings, History, Plus, Trash2, Paperclip, Image as ImageIcon, FileText } from 'lucide-react';
 import { chat, Message, ChatResponse, isAIConfigured, MessageAttachment } from '../services/ai/chatService';
 import { ChatMessage } from './ChatMessage';
 import { SettingsModal } from './SettingsModal';
 import { ConversationHistory } from './ConversationHistory';
 import { useConversation } from '../hooks/useConversation';
 import { logAgentAction, deleteConversation } from '../services/conversationService';
-import { uploadFile, isImageFile, fileToBase64, type UploadedFile } from '../services/fileUploadService';
+import { isImageFile, isDocumentFile, isTextReadable, fileToBase64, fileToText, isAllowedFileType, getFileExtension } from '../services/fileUploadService';
 
 interface ChatPanelProps {
   onEventCreated?: () => void;
@@ -101,20 +101,45 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const fileArray = Array.from(files) as File[];
       for (const file of fileArray) {
         // Validate file type
-        if (!isImageFile(file.type)) {
-          setError('Pouze obrázky jsou podporovány (JPEG, PNG, GIF, WebP)');
+        if (!isAllowedFileType(file.type)) {
+          setError(`Nepodporovaný typ souboru: ${file.name}. Povolené jsou obrázky, PDF, Word, Excel, CSV a textové soubory.`);
           continue;
         }
 
-        // Convert to base64 for AI
-        const base64 = await fileToBase64(file);
+        let attachment: MessageAttachment;
 
-        const attachment: MessageAttachment = {
-          type: 'image',
-          mimeType: file.type,
-          base64,
-          name: file.name
-        };
+        if (isImageFile(file.type)) {
+          // Handle images - convert to base64
+          const base64 = await fileToBase64(file);
+          attachment = {
+            type: 'image',
+            mimeType: file.type,
+            base64,
+            name: file.name
+          };
+        } else if (isTextReadable(file.type)) {
+          // Handle text-based files - read content directly
+          const textContent = await fileToText(file);
+          attachment = {
+            type: 'document',
+            mimeType: file.type,
+            textContent,
+            name: file.name
+          };
+        } else {
+          // Handle binary documents (PDF, Word, Excel, etc.)
+          // For now, we'll notify the user that we can only read text files
+          // In a production app, you'd use a library like pdf.js or mammoth.js
+          setError(`Soubor "${file.name}" byl přidán, ale binární formáty (PDF, Word, Excel) zatím nelze přímo číst. Pro plnou podporu použijte textové soubory (.txt, .csv, .json, .md).`);
+
+          // Still add it but with a placeholder
+          attachment = {
+            type: 'document',
+            mimeType: file.type,
+            textContent: `[Binární soubor: ${file.name} (${(file.size / 1024).toFixed(1)} KB) - obsah nelze přímo přečíst]`,
+            name: file.name
+          };
+        }
 
         setPendingAttachments(prev => [...prev, attachment]);
       }
@@ -396,13 +421,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               {pendingAttachments.map((attachment, index) => (
                 <div
                   key={index}
-                  className="relative group w-16 h-16 rounded-lg overflow-hidden border border-slate-200"
+                  className="relative group rounded-lg overflow-hidden border border-slate-200"
                 >
-                  <img
-                    src={`data:${attachment.mimeType};base64,${attachment.base64}`}
-                    alt={attachment.name || 'Příloha'}
-                    className="w-full h-full object-cover"
-                  />
+                  {attachment.type === 'image' && attachment.base64 ? (
+                    <img
+                      src={`data:${attachment.mimeType};base64,${attachment.base64}`}
+                      alt={attachment.name || 'Příloha'}
+                      className="w-16 h-16 object-cover"
+                    />
+                  ) : (
+                    <div className="w-auto h-16 px-3 flex items-center gap-2 bg-slate-50">
+                      <FileText className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                      <span className="text-xs text-slate-600 max-w-24 truncate">{attachment.name}</span>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeAttachment(index)}
@@ -419,7 +451,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.pptx,.txt,.csv,.json,.md,.odt,.ods"
             multiple
             onChange={handleFileChange}
             className="hidden"
@@ -432,12 +464,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading || isUploading || !configured}
               className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="Přidat obrázek"
+              title="Přidat soubor (obrázek, dokument, tabulka)"
             >
               {isUploading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                <ImageIcon className="w-5 h-5" />
+                <Paperclip className="w-5 h-5" />
               )}
             </button>
 

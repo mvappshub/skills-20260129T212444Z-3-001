@@ -32,9 +32,10 @@ import type { AIProvider } from './types';
 export type { AIProvider };
 
 export interface MessageAttachment {
-  type: 'image';
+  type: 'image' | 'document';
   mimeType: string;
-  base64: string;
+  base64?: string; // For images
+  textContent?: string; // For documents (extracted text)
   url?: string;
   name?: string;
 }
@@ -82,7 +83,7 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages.map(m => {
-          // For messages with images, use content array format
+          // For messages with attachments, use content array format
           if (m.role === 'user' && m.attachments?.length) {
             const contentParts: any[] = [{ type: 'text', text: m.content }];
             for (const attachment of m.attachments) {
@@ -92,6 +93,12 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
                   image_url: {
                     url: `data:${attachment.mimeType};base64,${attachment.base64}`
                   }
+                });
+              } else if (attachment.type === 'document' && attachment.textContent) {
+                // Add document content as additional text
+                contentParts.push({
+                  type: 'text',
+                  text: `\n\n--- Dokument: ${attachment.name || 'soubor'} ---\n${attachment.textContent}\n--- Konec dokumentu ---\n`
                 });
               }
             }
@@ -143,6 +150,11 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
                     mimeType: attachment.mimeType,
                     data: attachment.base64
                   }
+                });
+              } else if (attachment.type === 'document' && attachment.textContent) {
+                // Add document content as text with filename context
+                parts.push({
+                  text: `\n\n--- Dokument: ${attachment.name || 'soubor'} ---\n${attachment.textContent}\n--- Konec dokumentu ---\n`
                 });
               }
             }
