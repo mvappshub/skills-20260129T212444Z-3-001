@@ -11,6 +11,7 @@
  */
 
 import { ToolName } from './tools';
+import { globalMapContext } from './mapContext';
 import { fetchEvents, createEvent, updateEvent, deleteEvent as deleteEventFn } from '../eventService';
 import { fetchAlerts } from '../alertService';
 import { fetchWeatherForecast, fetchCurrentWeather } from '../weatherService';
@@ -24,10 +25,11 @@ import {
   GEMINI_MODELS
 } from '../settingsService';
 
-// Debug logging - only in development
+// Debug logging - ALWAYS ON for debugging
+const DEBUG = true;
 const debugLog = (...args: any[]) => {
-  if (import.meta.env?.DEV) {
-    console.log(...args);
+  if (DEBUG) {
+    console.warn('[🌲 SilvaPlan AI]', ...args);
   }
 };
 
@@ -294,17 +296,28 @@ function getSpeciesConditions(species: string) {
 const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
   async createEvent(args) {
     try {
-      debugLog('[ChatService] createEvent called with:', args);
+      console.warn('🔧 [createEvent] CALLED WITH ARGS:', JSON.stringify(args, null, 2));
+      console.warn('🔧 [createEvent] args.lat:', args.lat, 'args.lng:', args.lng, 'args.address:', args.address);
+
       // Default to 'planting' if type not provided by AI
       const eventType = (args.type as EventType) || EventType.PLANTING;
       const defaultLoc = getDefaultLocation();
+
+      const finalLat = args.lat || defaultLoc.lat;
+      const finalLng = args.lng || defaultLoc.lng;
+
+      console.warn('🔧 [createEvent] DEFAULT LOC:', defaultLoc);
+      console.warn('🔧 [createEvent] FINAL LAT/LNG:', finalLat, finalLng);
+      console.warn('🔧 [createEvent] USING DEFAULT?:', !args.lat || !args.lng);
+
       const event = await createEvent({
         title: args.title,
         type: eventType,
         status: EventStatus.PLANNED,
         start_at: parseISO(args.date),
-        lat: args.lat || defaultLoc.lat,
-        lng: args.lng || defaultLoc.lng,
+        lat: finalLat,
+        lng: finalLng,
+        address: args.address,
         notes: args.notes,
         items: (args.items || []).map((item: any) => ({
           id: crypto.randomUUID(),
@@ -313,19 +326,22 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
           size_class: item.sizeClass
         }))
       });
-      debugLog('[ChatService] createEvent success:', event.id);
+      console.warn('✅ [createEvent] SUCCESS:', event.id, 'at lat:', event.lat, 'lng:', event.lng, 'address:', event.address);
       return {
         success: true,
         event: {
           id: event.id,
           title: event.title,
           date: format(event.start_at, 'd.M.yyyy'),
-          type: event.type
+          type: event.type,
+          lat: event.lat,
+          lng: event.lng,
+          address: event.address
         },
-        message: `Akce "${event.title}" byla vytvořena na ${format(event.start_at, 'd.M.yyyy')}`
+        message: `Akce "${event.title}" byla vytvořena na ${format(event.start_at, 'd.M.yyyy')} na lokaci ${event.address || `${event.lat.toFixed(4)}, ${event.lng.toFixed(4)}`}`
       };
     } catch (error) {
-      console.error('[ChatService] createEvent error:', error);
+      console.error('❌ [createEvent] ERROR:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         success: false,
@@ -363,7 +379,14 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
 
   async deleteEvent(args) {
     try {
-      await deleteEventFn(args.eventId);
+      const id = args.eventId ?? args.id;
+      if (!id) {
+        return {
+          success: false,
+          message: 'Chyb? ID akce ke smaz?n?.'
+        };
+      }
+      await deleteEventFn(id);
       return {
         success: true,
         message: `Akce byla úspěšně smazána.`
@@ -587,16 +610,61 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
       },
       reason: `Optimální podmínky pro ${args.species}`
     };
+  },
+
+  async getMapContext(_args) {
+    console.warn('🗺️ [getMapContext] CALLED');
+    const context = globalMapContext.getContext();
+    console.warn('🗺️ [getMapContext] RAW CONTEXT:', JSON.stringify(context, null, 2));
+    const bestLocation = globalMapContext.getBestLocation();
+    console.warn('🗺️ [getMapContext] BEST LOCATION:', bestLocation);
+
+    if (bestLocation) {
+      const result = {
+        success: true,
+        hasLocation: true,
+        location: {
+          lat: bestLocation.lat,
+          lng: bestLocation.lng,
+          source: bestLocation.source
+        },
+        sourceDescription: bestLocation.source === 'picked'
+          ? 'Uživatel vybral lokaci na mapě'
+          : bestLocation.source === 'gps'
+            ? 'GPS pozice uživatele'
+            : 'Střed aktuálního pohledu mapy',
+        message: `Dostupná lokace: ${bestLocation.lat.toFixed(5)}, ${bestLocation.lng.toFixed(5)} (${bestLocation.source})`
+      };
+      console.warn('✅ [getMapContext] RETURNING:', JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const noLocationResult = {
+      success: true,
+      hasLocation: false,
+      message: 'Uživatel nemá vybranou lokaci. Zeptej se kde chce akci naplánovat, nebo navrhni použít výchozí lokaci.'
+    };
+    console.warn('⚠️ [getMapContext] NO LOCATION - RETURNING:', JSON.stringify(noLocationResult, null, 2));
+    return noLocationResult;
   }
 };
 
 // Execute a tool call
 async function executeTool(name: ToolName, args: any): Promise<any> {
+  console.warn('\n🚀 ============= TOOL EXECUTION =============');
+  console.warn('🚀 [executeTool] TOOL NAME:', name);
+  console.warn('🚀 [executeTool] ARGS:', JSON.stringify(args, null, 2));
+
   const handler = toolHandlers[name];
   if (!handler) {
+    console.error('❌ [executeTool] UNKNOWN TOOL:', name);
     throw new Error(`Unknown tool: ${name}`);
   }
-  return handler(args);
+
+  const result = await handler(args);
+  console.warn('🚀 [executeTool] RESULT:', JSON.stringify(result, null, 2));
+  console.warn('🚀 ============= END TOOL EXECUTION =============\n');
+  return result;
 }
 
 // ============================================================================
@@ -613,22 +681,29 @@ TVOJE SCHOPNOSTI:
 - Kontrola počasí pomocí getWeather
 - Analýza rizik pro plánované akce pomocí analyzeRisks
 - Doporučení optimálního data výsadby pomocí suggestPlantingDate
+- Zjištění aktuální lokace uživatele pomocí getMapContext
+
+KRITICKÁ PRAVIDLA PRO LOKACI:
+- PŘED vytvořením jakékoliv akce VŽDY nejprve zavolej getMapContext
+- Pokud getMapContext vrátí lokaci, POUŽIJ JI v createEvent (lat, lng parametry)
+- Pokud getMapContext nevrátí lokaci, ZEPTEJ SE uživatele kde chce akci naplánovat
+- NIKDY nevytvářej akci bez ověření lokace přes getMapContext
 
 DŮLEŽITÉ PRAVIDLA PRO PRÁCI S DOKUMENTY:
 Když uživatel přiloží dokument (text, tabulka), jeho obsah bude součástí zprávy označený jako "--- Dokument: název ---".
-1. IHNED analyzuj obsah dokumentu bez dalších otázek
-2. Pokud dokument obsahuje seznam výsadeb/akcí, PŘÍMO vytvoř všechny akce pomocí createEvent
-3. Nevyžaduj potvrzení - uživatel chce aby ses řídil dokumentem
+1. Nejprve zavolej getMapContext pro zjištění lokace
+2. Pak analyzuj obsah dokumentu a vytvoř akce pomocí createEvent s lokací z getMapContext
+3. Pokud lokace není dostupná, zeptej se uživatele
 
 PRAVIDLA PRO VYTVÁŘENÍ AKCÍ:
-- Pro createEvent VŽDY uveď: title, date (formát YYYY-MM-DD), type (planting/maintenance/other)
+- Pro createEvent VŽDY uveď: title, date (formát YYYY-MM-DD), type, lat, lng
 - Pokud type není jasný, použij "planting" pro výsadbu stromů
 - Latinské názvy stromů použij v notes
 
 POSTUP PŘI PLÁNOVÁNÍ VÝSADBY:
-1. Pokud je dokument přiložen, vytvoř akce podle něj IHNED
-2. Teprve PO vytvoření všech akcí můžeš volitelně zkontrolovat počasí
-3. Neblokuj vytváření akcí kontrolou počasí
+1. Zavolej getMapContext - zjisti dostupnou lokaci
+2. Pokud lokace existuje, vytvoř akce s touto lokací
+3. Pokud lokace neexistuje, zeptej se uživatele nebo nabídni výchozí lokaci
 
 LATINSKÉ NÁZVY BĚŽNÝCH DRUHŮ:
 - Dub letní = Quercus robur, Dub zimní = Quercus petraea
@@ -644,7 +719,7 @@ KONTEXT:
 - Aktuální datum: ${format(new Date(), 'd.M.yyyy')}
 - Výchozí lokace: ${defaultLoc.name} (${defaultLoc.lat}, ${defaultLoc.lng})
 
-Odpovídej stručně. Když vidíš dokument s daty, IHNED vytvoř akce bez zbytečných otázek.`;
+Odpovídej stručně. VŽDY volej getMapContext před createEvent.`;
 }
 
 // ============================================================================

@@ -8,6 +8,7 @@ export const createEventSchema = z.object({
   date: z.string().describe('Datum ve formátu YYYY-MM-DD'),
   lat: z.number().describe('Zeměpisná šířka lokace'),
   lng: z.number().describe('Zeměpisná délka lokace'),
+  address: z.string().optional().describe('Lidsky čitelná adresa nebo název místa, např. "Volarská 548/26, Praha 4"'),
   notes: z.string().optional().describe('Poznámky k akci'),
   items: z.array(z.object({
     species: z.string().describe('Latinský název druhu, např. "Quercus robur"'),
@@ -25,7 +26,10 @@ export const editEventSchema = z.object({
 });
 
 export const deleteEventSchema = z.object({
-  eventId: z.string().describe('ID akce ke smazání')
+  eventId: z.string().optional().describe('ID akce ke smaz?n?'),
+  id: z.string().optional().describe('Alternativn? kl?? ID akce ke smaz?n?')
+}).refine(data => Boolean(data.eventId || data.id), {
+  message: 'eventId nebo id mus? b?t vypln?no'
 });
 
 export const getEventsSchema = z.object({
@@ -52,10 +56,12 @@ export const suggestPlantingDateSchema = z.object({
   lng: z.number().optional().describe('Zeměpisná délka')
 });
 
+export const getMapContextSchema = z.object({});
+
 // Tool definitions pro AI SDK
 export const toolDefinitions = {
   createEvent: {
-    description: 'Vytvořit novou plánovanou akci (výsadba, údržba stromů). Použij když uživatel chce naplánovat novou činnost.',
+    description: 'Vytvořit novou plánovanou akci (výsadba, údržba stromů). PŘED voláním VŽDY nejprve zavolej getMapContext pro zjištění lokace.',
     parameters: createEventSchema
   },
   editEvent: {
@@ -85,7 +91,12 @@ export const toolDefinitions = {
   suggestPlantingDate: {
     description: 'Navrhnout optimální datum výsadby pro daný druh na základě počasí.',
     parameters: suggestPlantingDateSchema
+  },
+  getMapContext: {
+    description: 'Získat aktuální kontext mapy - vybranou lokaci, GPS pozici, nebo střed zobrazení. VŽDY volej před createEvent.',
+    parameters: getMapContextSchema
   }
 };
 
 export type ToolName = keyof typeof toolDefinitions;
+
