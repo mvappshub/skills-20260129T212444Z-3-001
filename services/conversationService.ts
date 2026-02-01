@@ -161,12 +161,11 @@ export async function saveMessage(
         throw error;
     }
 
-    // Update conversation stats
+    // Update conversation stats - just update timestamp, message count is managed by trigger
     await supabase
         .from('conversations')
         .update({
-            last_message_at: new Date().toISOString(),
-            message_count: supabase.rpc('increment_message_count', { conv_id: conversationId })
+            last_message_at: new Date().toISOString()
         })
         .eq('id', conversationId);
 
