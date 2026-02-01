@@ -389,12 +389,58 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
       await deleteEventFn(id);
       return {
         success: true,
-        message: `Akce byla úspěšně smazána.`
+        message: `Akce byla ?sp??n? smaz?na.`
       };
     } catch (error) {
       return {
         success: false,
-        message: `Nepodařilo se smazat akci: ${error}`
+        message: `Nepoda?ilo se smazat akci: ${error}`
+      };
+    }
+  },
+
+  async deleteEvents(args) {
+    try {
+      const allEvents = await fetchEvents();
+      let filtered = allEvents;
+
+      if (args.startDate) {
+        const start = parseISO(args.startDate);
+        filtered = filtered.filter(e => e.start_at >= start);
+      }
+      if (args.endDate) {
+        const end = parseISO(args.endDate);
+        filtered = filtered.filter(e => e.start_at <= end);
+      }
+      if (args.type) {
+        filtered = filtered.filter(e => e.type === args.type);
+      }
+      if (args.status) {
+        filtered = filtered.filter(e => e.status === args.status);
+      }
+      if (args.titleContains) {
+        const needle = args.titleContains.toLowerCase();
+        filtered = filtered.filter(e => e.title.toLowerCase().includes(needle));
+      }
+      if (args.missingAddress) {
+        filtered = filtered.filter(e => !e.address || e.address.trim() === '');
+      }
+
+      const maxCount = args.maxCount ?? 50;
+      const toDelete = filtered.slice(0, maxCount);
+
+      for (const ev of toDelete) {
+        await deleteEventFn(ev.id);
+      }
+
+      return {
+        success: true,
+        message: `Smaz?no ${toDelete.length} akc?.`
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Nepoda?ilo se smazat akce: ${error}`
       };
     }
   },

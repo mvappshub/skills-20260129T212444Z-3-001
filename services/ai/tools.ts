@@ -32,6 +32,18 @@ export const deleteEventSchema = z.object({
   message: 'eventId nebo id mus? b?t vypln?no'
 });
 
+export const deleteEventsSchema = z.object({
+  startDate: z.string().optional().describe('Po??te?n? datum filtru YYYY-MM-DD'),
+  endDate: z.string().optional().describe('Koncov? datum filtru YYYY-MM-DD'),
+  type: z.enum(['planting', 'maintenance', 'other']).optional().describe('Filtr dle typu'),
+  status: z.enum(['planned', 'done', 'canceled']).optional().describe('Filtr dle stavu'),
+  titleContains: z.string().optional().describe('??st n?zvu akce'),
+  missingAddress: z.boolean().optional().describe('Smazat jen akce bez adresy'),
+  maxCount: z.number().int().positive().max(200).optional().describe('Max po?et smazan?ch z?znam? (ochrana)')
+}).refine(data => Boolean(data.startDate || data.endDate || data.type || data.status || data.titleContains || data.missingAddress), {
+  message: 'Mus?? zadat alespo? jeden filtr'
+});
+
 export const getEventsSchema = z.object({
   startDate: z.string().optional().describe('Počáteční datum filtru YYYY-MM-DD'),
   endDate: z.string().optional().describe('Koncové datum filtru YYYY-MM-DD'),
@@ -69,8 +81,12 @@ export const toolDefinitions = {
     parameters: editEventSchema
   },
   deleteEvent: {
-    description: 'Smazat akci z kalendáře. Použij pouze když uživatel explicitně požádá o smazání.',
+    description: 'Smazat akci z kalend??e. Pou?ij pouze kdy? u?ivatel explicitn? po??d? o smaz?n?.',
     parameters: deleteEventSchema
+  },
+  deleteEvents: {
+    description: 'Hromadn? smazat akce podle filtru (nap?. datum, typ, stav, chyb?j?c? adresa). Pou?ij pouze p?i explicitn?m po?adavku u?ivatele.',
+    parameters: deleteEventsSchema
   },
   getEvents: {
     description: 'Získat seznam akcí z kalendáře. Použij pro zobrazení plánu nebo hledání konkrétních akcí.',
