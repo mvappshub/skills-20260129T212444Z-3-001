@@ -258,6 +258,38 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
 // Tool Execution Handlers
 // ============================================================================
 
+// Species-specific planting conditions
+const SPECIES_CONDITIONS: Record<string, {
+  tempMin: number;
+  tempMax: number;
+  moistureMin: number;
+  frostSensitive: boolean;
+}> = {
+  'quercus robur': { tempMin: 5, tempMax: 25, moistureMin: 0.2, frostSensitive: true },
+  'quercus petraea': { tempMin: 5, tempMax: 25, moistureMin: 0.2, frostSensitive: true },
+  'tilia cordata': { tempMin: 5, tempMax: 22, moistureMin: 0.25, frostSensitive: true },
+  'acer platanoides': { tempMin: 5, tempMax: 23, moistureMin: 0.2, frostSensitive: true },
+  'fagus sylvatica': { tempMin: 5, tempMax: 20, moistureMin: 0.3, frostSensitive: true },
+  'betula pendula': { tempMin: 3, tempMax: 25, moistureMin: 0.15, frostSensitive: false },
+  'fraxinus excelsior': { tempMin: 5, tempMax: 24, moistureMin: 0.25, frostSensitive: true },
+  'carpinus betulus': { tempMin: 5, tempMax: 22, moistureMin: 0.25, frostSensitive: true },
+  'sorbus aucuparia': { tempMin: 3, tempMax: 22, moistureMin: 0.2, frostSensitive: false },
+  'aesculus hippocastanum': { tempMin: 5, tempMax: 22, moistureMin: 0.25, frostSensitive: true },
+  'populus nigra': { tempMin: 5, tempMax: 28, moistureMin: 0.3, frostSensitive: false },
+  'platanus hispanica': { tempMin: 8, tempMax: 28, moistureMin: 0.2, frostSensitive: true },
+  'pinus sylvestris': { tempMin: 0, tempMax: 25, moistureMin: 0.15, frostSensitive: false },
+  'picea abies': { tempMin: 0, tempMax: 22, moistureMin: 0.2, frostSensitive: false },
+  'malus domestica': { tempMin: 5, tempMax: 22, moistureMin: 0.25, frostSensitive: true },
+  'pyrus communis': { tempMin: 5, tempMax: 22, moistureMin: 0.25, frostSensitive: true },
+};
+
+const DEFAULT_SPECIES_CONDITIONS = { tempMin: 5, tempMax: 25, moistureMin: 0.2, frostSensitive: true };
+
+function getSpeciesConditions(species: string) {
+  const normalized = species.toLowerCase().trim();
+  return SPECIES_CONDITIONS[normalized] || DEFAULT_SPECIES_CONDITIONS;
+}
+
 const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
   async createEvent(args) {
     try {
@@ -507,22 +539,29 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
       14
     );
 
-    // Find best day based on conditions
+    const conditions = getSpeciesConditions(args.species);
+
     const suitable = forecast.filter(f =>
-      f.temperatureMin > 5 &&
-      f.temperatureMax < 25 &&
+      f.temperatureMin > conditions.tempMin &&
+      f.temperatureMax < conditions.tempMax &&
       f.precipitation < 5 &&
-      f.soilMoisture0to1cm > 0.2
+      f.soilMoisture0to1cm > conditions.moistureMin &&
+      (!conditions.frostSensitive || f.temperatureMin > 2)
     );
 
     if (suitable.length === 0) {
       return {
         species: args.species,
-        suggestion: 'V následujících 14 dnech nejsou ideální podmínky pro výsadbu.',
+        suggestion: `V následujících 14 dnech nejsou ideální podmínky pro ${args.species}.`,
         alternatives: forecast.slice(0, 3).map(f => ({
           date: format(f.date, 'd.M.yyyy'),
           conditions: `${f.temperatureMin.toFixed(0)}-${f.temperatureMax.toFixed(0)}°C, srážky ${f.precipitation.toFixed(0)}mm`
-        }))
+        })),
+        speciesRequirements: {
+          tempRange: `${conditions.tempMin}-${conditions.tempMax}°C`,
+          minMoisture: `${(conditions.moistureMin * 100).toFixed(0)}%`,
+          frostSensitive: conditions.frostSensitive
+        }
       };
     }
 
@@ -536,7 +575,12 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
         precipitation: `${best.precipitation.toFixed(0)} mm`,
         soilMoisture: `${(best.soilMoisture0to1cm * 100).toFixed(0)}%`
       },
-      reason: 'Optimální teplota, minimální srážky, dobrá vlhkost půdy'
+      speciesRequirements: {
+        tempRange: `${conditions.tempMin}-${conditions.tempMax}°C`,
+        minMoisture: `${(conditions.moistureMin * 100).toFixed(0)}%`,
+        frostSensitive: conditions.frostSensitive
+      },
+      reason: `Optimální podmínky pro ${args.species}`
     };
   }
 };

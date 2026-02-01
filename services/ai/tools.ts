@@ -4,7 +4,7 @@ import { z } from 'zod';
 // Schema definice pro AI tools
 export const createEventSchema = z.object({
   title: z.string().describe('Název akce, např. "Výsadba dubů v parku"'),
-  type: z.enum(['planting', 'maintenance', 'other']).describe('Typ akce'),
+  type: z.enum(['planting', 'maintenance', 'other']).default('planting').describe('Typ akce (výchozí: planting)'),
   date: z.string().describe('Datum ve formátu YYYY-MM-DD'),
   lat: z.number().describe('Zeměpisná šířka lokace'),
   lng: z.number().describe('Zeměpisná délka lokace'),

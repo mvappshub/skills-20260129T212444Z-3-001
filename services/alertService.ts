@@ -1,7 +1,7 @@
 // services/alertService.ts
 import { supabase } from '../lib/supabase';
 import { MeteoAlert, AlertLevel, SOIL_MOISTURE_THRESHOLDS } from '../types';
-import { fetchCurrentWeather } from './weatherService';
+import { fetchCurrentWeather, fetchWeatherForecast } from './weatherService';
 
 // MeteoAlarm severity mapping
 const METEOALARM_LEVEL_MAP: Record<string, AlertLevel> = {
@@ -187,21 +187,83 @@ async function fetchCachedAlerts(): Promise<MeteoAlert[]> {
 }
 
 /**
+ * Generate alerts from weather forecast data
+ * Detects: frost, storms, heat waves
+ */
+async function generateWeatherAlerts(lat: number, lng: number): Promise<MeteoAlert[]> {
+  try {
+    const forecast = await fetchWeatherForecast(lat, lng, 3);
+    const alerts: MeteoAlert[] = [];
+
+    for (const day of forecast) {
+      const date = day.date;
+
+      // Storm detection (high precipitation or storm weather codes)
+      if (day.precipitation > 20 || [95, 96, 99].includes(day.weatherCode)) {
+        alerts.push({
+          id: `storm-${date.getTime()}`,
+          type: 'storm',
+          level: day.precipitation > 40 ? AlertLevel.DANGER : AlertLevel.WARNING,
+          title: 'Silné srážky / Bouřka',
+          description: `Očekávané srážky: ${day.precipitation.toFixed(0)}mm`,
+          valid_from: date,
+          valid_to: new Date(date.getTime() + 24 * 60 * 60 * 1000),
+          affected_area_center: { lat, lng }
+        });
+      }
+
+      // Frost detection
+      if (day.temperatureMin < 0) {
+        alerts.push({
+          id: `frost-${date.getTime()}`,
+          type: 'frost',
+          level: day.temperatureMin < -5 ? AlertLevel.DANGER : AlertLevel.WARNING,
+          title: 'Mráz',
+          description: `Minimální teplota: ${day.temperatureMin.toFixed(0)}°C`,
+          valid_from: date,
+          valid_to: new Date(date.getTime() + 24 * 60 * 60 * 1000),
+          affected_area_center: { lat, lng }
+        });
+      }
+
+      // Heat detection
+      if (day.temperatureMax > 30) {
+        alerts.push({
+          id: `heat-${date.getTime()}`,
+          type: 'heat',
+          level: day.temperatureMax > 35 ? AlertLevel.DANGER : AlertLevel.WARNING,
+          title: 'Vedro',
+          description: `Maximální teplota: ${day.temperatureMax.toFixed(0)}°C`,
+          valid_from: date,
+          valid_to: new Date(date.getTime() + 24 * 60 * 60 * 1000),
+          affected_area_center: { lat, lng }
+        });
+      }
+    }
+
+    return alerts;
+  } catch (error) {
+    console.error('[AlertService] Failed to generate weather alerts:', error);
+    return [];
+  }
+}
+
+/**
  * Main function to fetch all alerts
- * Combines: MeteoAlarm (official) + Drought detection + Supabase cache
+ * Combines: Weather alerts + Drought detection + Supabase cache
  */
 export async function fetchAlerts(
   userLat: number = 50.0755, // Default: Praha
   userLng: number = 14.4378
 ): Promise<MeteoAlert[]> {
-  const [meteoAlarmAlerts, cachedAlerts, droughtAlert] = await Promise.all([
-    fetchMeteoAlarmAlerts(),
+  const [weatherAlerts, cachedAlerts, droughtAlert] = await Promise.all([
+    generateWeatherAlerts(userLat, userLng),
     fetchCachedAlerts(),
     generateDroughtAlert(userLat, userLng),
   ]);
 
   // Combine all alerts, deduplicate by id
-  const allAlerts = [...meteoAlarmAlerts, ...cachedAlerts];
+  const allAlerts = [...weatherAlerts, ...cachedAlerts];
 
   if (droughtAlert) {
     allAlerts.push(droughtAlert);
