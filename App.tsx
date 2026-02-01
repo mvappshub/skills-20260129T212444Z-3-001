@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   format,
   startOfMonth,
@@ -26,6 +26,7 @@ import { useNotifications } from './hooks/useNotifications';
 import { fetchEvents, createEvent } from './services/eventService';
 import { fetchTrees } from './services/treeService';
 import { fetchAlerts } from './services/alertService';
+import { reverseGeocode } from './services/geocodingService';
 import {
   fetchWeatherForecast,
   fetchCurrentWeather,
@@ -76,6 +77,9 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPickingLocation, setIsPickingLocation] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [pickedLocationAddress, setPickedLocationAddress] = useState<string | null>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const geocodeAbortRef = useRef<AbortController | null>(null);
   const [focusLocation, setFocusLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
 
   // --- Chat State ---
@@ -189,6 +193,38 @@ export default function App() {
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
 
+  const formatLatLng = (lat: number, lng: number) => `Souřadnice: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+  const resolveAddress = async (lat: number, lng: number) => {
+    if (geocodeAbortRef.current) {
+      geocodeAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    geocodeAbortRef.current = controller;
+    setIsGeocoding(true);
+    setPickedLocationAddress(null);
+
+    try {
+      const resolved = await reverseGeocode(lat, lng, controller.signal);
+      if (!controller.signal.aborted) {
+        setPickedLocationAddress(resolved || formatLatLng(lat, lng));
+      }
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        setPickedLocationAddress(formatLatLng(lat, lng));
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setIsGeocoding(false);
+      }
+    }
+  };
+
+  const setPickedLocationWithAddress = (lat: number, lng: number) => {
+    setPickedLocation({ lat, lng });
+    resolveAddress(lat, lng);
+  };
+
   const handleMapFocus = (lat: number, lng: number, zoom?: number, switchToMap = true) => {
     console.log(`Focusing map on ${lat}, ${lng}`);
     setFocusLocation({ lat, lng, zoom });
@@ -237,19 +273,34 @@ export default function App() {
   const handleOpenPlanModal = () => {
     setIsModalOpen(true);
     setPickedLocation(null);
+    setPickedLocationAddress(null);
+    setIsGeocoding(false);
+    if (geocodeAbortRef.current) {
+      geocodeAbortRef.current.abort();
+    }
   };
 
   const handleStartPickingLocation = () => {
     setIsModalOpen(false);
     setIsPickingLocation(true);
+    setPickedLocationAddress(null);
   };
 
   const handleMapClick = (lat: number, lng: number) => {
     if (isPickingLocation) {
-      setPickedLocation({ lat, lng });
       setIsPickingLocation(false);
       setIsModalOpen(true);
+      setPickedLocationWithAddress(lat, lng);
     }
+  };
+
+  const handleCancelPickingLocation = () => {
+    setIsPickingLocation(false);
+    setIsModalOpen(true);
+  };
+
+  const handleSetLocation = (lat: number, lng: number) => {
+    setPickedLocationWithAddress(lat, lng);
   };
 
   const handleSaveEvent = async (eventData: Partial<CalendarEvent>) => {
@@ -261,6 +312,9 @@ export default function App() {
         start_at: eventData.start_at!,
         lat: eventData.lat!,
         lng: eventData.lng!,
+        end_at: eventData.end_at,
+        address: eventData.address || pickedLocationAddress || undefined,
+        radius_m: eventData.radius_m,
         items: eventData.items || [],
         notes: eventData.notes
       });
@@ -358,8 +412,8 @@ export default function App() {
             <button
               onClick={() => setViewMode('calendar')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${viewMode === 'calendar'
-                  ? 'bg-white text-emerald-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
+                ? 'bg-white text-emerald-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-800'
                 }`}
             >
               Kalendář
@@ -367,8 +421,8 @@ export default function App() {
             <button
               onClick={() => setViewMode('map')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${viewMode === 'map'
-                  ? 'bg-white text-emerald-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-800'
+                ? 'bg-white text-emerald-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-800'
                 }`}
             >
               Mapa
@@ -486,6 +540,7 @@ export default function App() {
                 isPickingLocation={isPickingLocation}
                 tempPinLocation={pickedLocation}
                 focusLocation={focusLocation}
+                onCancelPick={handleCancelPickingLocation}
               />
             </div>
           )}
@@ -546,18 +601,30 @@ export default function App() {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveEvent}
         onPickLocation={handleStartPickingLocation}
-        onSetLocation={(lat, lng) => setPickedLocation({ lat, lng })}
+        onSetLocation={handleSetLocation}
         initialDate={selectedDate}
         pickedLocation={pickedLocation}
+        address={pickedLocationAddress}
+        isGeocoding={isGeocoding}
       />
 
       {/* AI Chat Assistant */}
-      <ChatPanel
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        onEventCreated={handleAIEventChange}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
+      {(() => {
+        const mapContextValue = {
+          viewState: focusLocation,
+          pickedLocation: pickedLocation
+        };
+        console.warn('🏠 [App.tsx] RENDERING ChatPanel with mapContext:', JSON.stringify(mapContextValue, null, 2));
+        return (
+          <ChatPanel
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            onEventCreated={handleAIEventChange}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            mapContext={mapContextValue}
+          />
+        );
+      })()}
       {!isChatOpen && (
         <ChatButton
           onClick={() => setIsChatOpen(true)}

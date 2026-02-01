@@ -21,6 +21,7 @@ export async function fetchEvents(): Promise<CalendarEvent[]> {
         end_at: e.end_at ? new Date(e.end_at) : undefined,
         lat: e.lat,
         lng: e.lng,
+        address: e.address,
         radius_m: e.radius_m,
         notes: e.notes,
         items: (e.items || []).map((item: any) => ({
@@ -42,8 +43,11 @@ export async function createEvent(event: Omit<CalendarEvent, 'id'>): Promise<Cal
             status: eventData.status,
             title: eventData.title,
             start_at: eventData.start_at.toISOString(),
+            end_at: eventData.end_at ? eventData.end_at.toISOString() : null,
             lat: eventData.lat,
             lng: eventData.lng,
+            address: eventData.address,
+            radius_m: eventData.radius_m,
             notes: eventData.notes
         })
         .select()
@@ -85,6 +89,8 @@ export async function updateEvent(
     if (updates.end_at) updateData.end_at = updates.end_at.toISOString();
     if (updates.lat !== undefined) updateData.lat = updates.lat;
     if (updates.lng !== undefined) updateData.lng = updates.lng;
+    if (updates.radius_m !== undefined) updateData.radius_m = updates.radius_m;
+    if (updates.address !== undefined) updateData.address = updates.address;
     if (updates.notes !== undefined) updateData.notes = updates.notes;
 
     const { data, error } = await supabase
@@ -105,6 +111,7 @@ export async function updateEvent(
         end_at: data.end_at ? new Date(data.end_at) : undefined,
         lat: data.lat,
         lng: data.lng,
+        address: data.address,
         radius_m: data.radius_m,
         notes: data.notes,
         items: (data.items || []).map((item: any) => ({

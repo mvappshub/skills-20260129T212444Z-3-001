@@ -60,10 +60,15 @@ const SETTINGS_KEY = 'silvaplan_ai_settings';
 const MODELS_CACHE_KEY = 'silvaplan_openrouter_models';
 const MODELS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
+// Environment variables - loaded from .env.local (ignored in tests)
+const IS_TEST_ENV = import.meta.env.MODE === 'test';
+const ENV_OPENROUTER_API_KEY = IS_TEST_ENV ? '' : (import.meta.env.VITE_OPENROUTER_API_KEY || '');
+const ENV_GEMINI_API_KEY = IS_TEST_ENV ? '' : (import.meta.env.GEMINI_API_KEY || '');
+
 const DEFAULT_SETTINGS: AISettings = {
   provider: 'openrouter',
-  openrouterApiKey: '',
-  geminiApiKey: '',
+  openrouterApiKey: ENV_OPENROUTER_API_KEY,
+  geminiApiKey: ENV_GEMINI_API_KEY,
   openrouterModelId: 'google/gemini-3-flash-preview',
   geminiModelId: 'gemini-2.5-flash',
   streamResponses: false,
@@ -153,8 +158,9 @@ export function getSettings(): AISettings {
       const parsed = JSON.parse(stored) as Partial<AISettings>;
       return {
         provider: parsed.provider ?? DEFAULT_SETTINGS.provider,
-        openrouterApiKey: parsed.openrouterApiKey ?? '',
-        geminiApiKey: parsed.geminiApiKey ?? '',
+        // Use localStorage value if present, otherwise fall back to env variable
+        openrouterApiKey: parsed.openrouterApiKey || ENV_OPENROUTER_API_KEY,
+        geminiApiKey: parsed.geminiApiKey || ENV_GEMINI_API_KEY,
         openrouterModelId: parsed.openrouterModelId ?? DEFAULT_SETTINGS.openrouterModelId,
         geminiModelId: parsed.geminiModelId ?? DEFAULT_SETTINGS.geminiModelId,
         streamResponses: parsed.streamResponses ?? DEFAULT_SETTINGS.streamResponses,
