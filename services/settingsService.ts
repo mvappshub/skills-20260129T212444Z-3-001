@@ -33,6 +33,7 @@ export interface AISettings {
 
   // Model selection
   openrouterModelId: string;
+  geminiModelId: string;
 
   // User preferences
   streamResponses: boolean;
@@ -59,6 +60,7 @@ const DEFAULT_SETTINGS: AISettings = {
   openrouterApiKey: '',
   geminiApiKey: '',
   openrouterModelId: 'google/gemini-3-flash-preview',
+  geminiModelId: 'gemini-2.5-flash',
   streamResponses: false,
   maxHistoryMessages: 50
 };
@@ -146,6 +148,7 @@ export function getSettings(): AISettings {
         openrouterApiKey: parsed.openrouterApiKey ?? '',
         geminiApiKey: parsed.geminiApiKey ?? '',
         openrouterModelId: parsed.openrouterModelId ?? DEFAULT_SETTINGS.openrouterModelId,
+        geminiModelId: parsed.geminiModelId ?? DEFAULT_SETTINGS.geminiModelId,
         streamResponses: parsed.streamResponses ?? DEFAULT_SETTINGS.streamResponses,
         maxHistoryMessages: parsed.maxHistoryMessages ?? DEFAULT_SETTINGS.maxHistoryMessages
       };
@@ -364,7 +367,7 @@ export function getProviderConfig(): {
       apiKey
     };
   } else {
-    const geminiModel = GEMINI_MODELS.find(m => m.id === settings.openrouterModelId);
+    const geminiModel = GEMINI_MODELS.find(m => m.id === settings.geminiModelId);
     return {
       provider: 'gemini',
       modelId: geminiModel?.id || 'gemini-2.5-flash',

@@ -23,6 +23,13 @@ import {
   GEMINI_MODELS
 } from '../settingsService';
 
+// Debug logging - only in development
+const debugLog = (...args: any[]) => {
+  if (import.meta.env?.DEV) {
+    console.log(...args);
+  }
+};
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -180,12 +187,18 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
             contents.push({ role: 'model', parts });
           }
         } else if (msg.role === 'tool') {
+          let parsedContent: any;
+          try {
+            parsedContent = JSON.parse(msg.content);
+          } catch {
+            parsedContent = { raw: msg.content };
+          }
           contents.push({
             role: 'user',
             parts: [{
               functionResponse: {
                 name: msg.name,
-                response: JSON.parse(msg.content)
+                response: parsedContent
               }
             }]
           });
@@ -226,7 +239,7 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
         }
         if (part.functionCall) {
           tool_calls.push({
-            id: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: `call_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
             type: 'function',
             function: {
               name: part.functionCall.name,
@@ -248,7 +261,7 @@ const PROVIDER_CONFIGS: Record<AIProvider, ProviderConfig> = {
 const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
   async createEvent(args) {
     try {
-      console.log('[ChatService] createEvent called with:', args);
+      debugLog('[ChatService] createEvent called with:', args);
       // Default to 'planting' if type not provided by AI
       const eventType = (args.type as EventType) || EventType.PLANTING;
       const event = await createEvent({
@@ -266,7 +279,7 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
           size_class: item.sizeClass
         }))
       });
-      console.log('[ChatService] createEvent success:', event.id);
+      debugLog('[ChatService] createEvent success:', event.id);
       return {
         success: true,
         event: {
@@ -401,81 +414,90 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
   },
 
   async analyzeRisks(args) {
-    const [events, alerts, forecast] = await Promise.all([
-      fetchEvents(),
-      fetchAlerts(),
-      fetchWeatherForecast(50.0755, 14.4378, 14)
-    ]);
+    try {
+      const [events, alerts, forecast] = await Promise.all([
+        fetchEvents(),
+        fetchAlerts(),
+        fetchWeatherForecast(50.0755, 14.4378, 14)
+      ]);
 
-    const upcomingEvents = events.filter(e =>
-      e.status === EventStatus.PLANNED &&
-      e.start_at > new Date() &&
-      e.start_at < addDays(new Date(), 14)
-    );
-
-    const risks: { eventId: string; eventTitle: string; eventDate: string; risks: string[] }[] = [];
-
-    for (const event of upcomingEvents) {
-      if (args.eventId && event.id !== args.eventId) continue;
-
-      const eventRisks: string[] = [];
-      const eventDate = event.start_at;
-
-      // Check alerts
-      const relevantAlerts = alerts.filter(a =>
-        isWithinInterval(eventDate, { start: a.valid_from, end: a.valid_to })
+      const upcomingEvents = events.filter(e =>
+        e.status === EventStatus.PLANNED &&
+        e.start_at > new Date() &&
+        e.start_at < addDays(new Date(), 14)
       );
 
-      for (const alert of relevantAlerts) {
-        if (alert.level === 'danger') {
-          eventRisks.push(`KRITICKÉ: ${alert.title} - ${alert.description}`);
-        } else if (alert.level === 'warning') {
-          eventRisks.push(`VAROVÁNÍ: ${alert.title}`);
+      const risks: { eventId: string; eventTitle: string; eventDate: string; risks: string[] }[] = [];
+
+      for (const event of upcomingEvents) {
+        if (args.eventId && event.id !== args.eventId) continue;
+
+        const eventRisks: string[] = [];
+        const eventDate = event.start_at;
+
+        // Check alerts
+        const relevantAlerts = alerts.filter(a =>
+          isWithinInterval(eventDate, { start: a.valid_from, end: a.valid_to })
+        );
+
+        for (const alert of relevantAlerts) {
+          if (alert.level === 'danger') {
+            eventRisks.push(`KRITICKÉ: ${alert.title} - ${alert.description}`);
+          } else if (alert.level === 'warning') {
+            eventRisks.push(`VAROVÁNÍ: ${alert.title}`);
+          }
+        }
+
+        // Check forecast
+        const dayForecast = forecast.find(f =>
+          format(f.date, 'yyyy-MM-dd') === format(eventDate, 'yyyy-MM-dd')
+        );
+
+        if (dayForecast) {
+          if (dayForecast.soilMoisture0to1cm < 0.1) {
+            eventRisks.push('Kriticky nízká vlhkost půdy - nutná zálivka po výsadbě');
+          }
+          if (dayForecast.temperatureMin < 0) {
+            eventRisks.push(`Riziko mrazu (min. ${dayForecast.temperatureMin.toFixed(0)}°C)`);
+          }
+          if (dayForecast.precipitation > 10) {
+            eventRisks.push(`Očekávané silné srážky (${dayForecast.precipitation.toFixed(0)}mm)`);
+          }
+          if (dayForecast.temperatureMax > 30) {
+            eventRisks.push(`Příliš vysoká teplota (${dayForecast.temperatureMax.toFixed(0)}°C) - stres pro sazenice`);
+          }
+        }
+
+        if (eventRisks.length > 0) {
+          risks.push({
+            eventId: event.id,
+            eventTitle: event.title,
+            eventDate: format(event.start_at, 'd.M.yyyy'),
+            risks: eventRisks
+          });
         }
       }
 
-      // Check forecast
-      const dayForecast = forecast.find(f =>
-        format(f.date, 'yyyy-MM-dd') === format(eventDate, 'yyyy-MM-dd')
-      );
-
-      if (dayForecast) {
-        if (dayForecast.soilMoisture0to1cm < 0.1) {
-          eventRisks.push('Kriticky nízká vlhkost půdy - nutná zálivka po výsadbě');
-        }
-        if (dayForecast.temperatureMin < 0) {
-          eventRisks.push(`Riziko mrazu (min. ${dayForecast.temperatureMin.toFixed(0)}°C)`);
-        }
-        if (dayForecast.precipitation > 10) {
-          eventRisks.push(`Očekávané silné srážky (${dayForecast.precipitation.toFixed(0)}mm)`);
-        }
-        if (dayForecast.temperatureMax > 30) {
-          eventRisks.push(`Příliš vysoká teplota (${dayForecast.temperatureMax.toFixed(0)}°C) - stres pro sazenice`);
-        }
+      if (risks.length === 0) {
+        return {
+          analyzedEvents: upcomingEvents.length,
+          message: 'Žádná rizika nebyla nalezena pro nadcházející akce.'
+        };
       }
 
-      if (eventRisks.length > 0) {
-        risks.push({
-          eventId: event.id,
-          eventTitle: event.title,
-          eventDate: format(event.start_at, 'd.M.yyyy'),
-          risks: eventRisks
-        });
-      }
-    }
-
-    if (risks.length === 0) {
       return {
         analyzedEvents: upcomingEvents.length,
-        message: 'Žádná rizika nebyla nalezena pro nadcházející akce.'
+        risksFound: risks.length,
+        details: risks
+      };
+    } catch (error) {
+      console.error('[ChatService] analyzeRisks error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        message: 'Nepodařilo se analyzovat rizika. Zkuste to znovu.'
       };
     }
-
-    return {
-      analyzedEvents: upcomingEvents.length,
-      risksFound: risks.length,
-      details: risks
-    };
   },
 
   async suggestPlantingDate(args) {
