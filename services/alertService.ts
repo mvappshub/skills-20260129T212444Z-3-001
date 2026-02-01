@@ -45,10 +45,17 @@ interface MeteoAlarmWarning {
 
 /**
  * Fetch alerts from MeteoAlarm API for Czech Republic
+ * NOTE: Disabled due to CORS issues and API unavailability (503)
+ * TODO: Implement server-side proxy or use different API
  */
 async function fetchMeteoAlarmAlerts(): Promise<MeteoAlert[]> {
+  // MeteoAlarm API has CORS issues and is frequently unavailable
+  // Return empty array to prevent console spam
+  // When a server-side proxy is implemented, enable this function
+  return [];
+
+  /* Original implementation - disabled due to CORS:
   try {
-    // MeteoAlarm Atom feed for Czechia
     const response = await fetch(
       'https://feeds.meteoalarm.org/api/v1/warnings/feeds-czechia',
       { signal: AbortSignal.timeout(10000) }
@@ -66,10 +73,8 @@ async function fetchMeteoAlarmAlerts(): Promise<MeteoAlert[]> {
       const type = METEOALARM_TYPE_MAP[warning.awareness_type] || 'storm';
       const level = METEOALARM_LEVEL_MAP[warning.awareness_level] || AlertLevel.INFO;
 
-      // Default center for Czech Republic if no geometry
       let center = { lat: 49.8175, lng: 15.4730 };
       if (warning.geometry?.coordinates) {
-        // GeoJSON format: [lng, lat]
         center = {
           lat: warning.geometry.coordinates[1],
           lng: warning.geometry.coordinates[0],
@@ -91,6 +96,7 @@ async function fetchMeteoAlarmAlerts(): Promise<MeteoAlert[]> {
     console.warn('Failed to fetch MeteoAlarm alerts:', error);
     return [];
   }
+  */
 }
 
 /**

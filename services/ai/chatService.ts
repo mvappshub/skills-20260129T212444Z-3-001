@@ -249,9 +249,11 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
   async createEvent(args) {
     try {
       console.log('[ChatService] createEvent called with:', args);
+      // Default to 'planting' if type not provided by AI
+      const eventType = (args.type as EventType) || EventType.PLANTING;
       const event = await createEvent({
         title: args.title,
-        type: args.type as EventType,
+        type: eventType,
         status: EventStatus.PLANNED,
         start_at: parseISO(args.date),
         lat: args.lat || 50.0755,
