@@ -119,14 +119,34 @@ export async function updateConversationTitle(
  * Delete a conversation and all its messages
  */
 export async function deleteConversation(id: string): Promise<void> {
-    const { error } = await supabase
+    const { error: messagesError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', id);
+
+    if (messagesError) {
+        console.error('[ConversationService] Error deleting messages:', messagesError);
+        throw messagesError;
+    }
+
+    const { error: actionsError } = await supabase
+        .from('agent_actions')
+        .delete()
+        .eq('conversation_id', id);
+
+    if (actionsError) {
+        console.error('[ConversationService] Error deleting actions:', actionsError);
+        throw actionsError;
+    }
+
+    const { error: conversationError } = await supabase
         .from('conversations')
         .delete()
         .eq('id', id);
 
-    if (error) {
-        console.error('[ConversationService] Error deleting conversation:', error);
-        throw error;
+    if (conversationError) {
+        console.error('[ConversationService] Error deleting conversation:', conversationError);
+        throw conversationError;
     }
 }
 

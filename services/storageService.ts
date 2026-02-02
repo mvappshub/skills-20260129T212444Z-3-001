@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 /**
  * Uploads a photo file to Supabase Storage and returns the public URL
  */
-export async function uploadTreePhoto(file: File, treeId: string): Promise<string> {
+export async function uploadTreePhoto(file: File, treeId: string): Promise<{ url: string; path: string }> {
     const fileExt = file.name.split('.').pop() || 'jpg'
     const fileName = `${treeId}/${Date.now()}.${fileExt}`
 
@@ -23,7 +23,7 @@ export async function uploadTreePhoto(file: File, treeId: string): Promise<strin
         .from('tree-photos')
         .getPublicUrl(fileName)
 
-    return data.publicUrl
+    return { url: data.publicUrl, path: fileName }
 }
 
 /**
@@ -53,7 +53,14 @@ export async function uploadAndSavePhoto(
     treeId: string,
     caption?: string
 ): Promise<string> {
-    const url = await uploadTreePhoto(file, treeId)
-    await savePhotoRecord(treeId, url, caption)
-    return url
+    const { url, path } = await uploadTreePhoto(file, treeId)
+    try {
+        await savePhotoRecord(treeId, url, caption)
+        return url
+    } catch (error) {
+        await supabase.storage
+            .from('tree-photos')
+            .remove([path])
+        throw error
+    }
 }

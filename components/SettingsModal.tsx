@@ -30,6 +30,8 @@ import {
   getOpenRouterModels,
   RECOMMENDED_OPENROUTER_MODELS,
   GEMINI_MODELS,
+  getActiveModelId,
+  updateModelId,
   type OpenRouterModel,
   type AISettings,
   type AIProvider
@@ -116,7 +118,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
 
   const handleModelChange = (modelId: string) => {
-    setSettings(prev => ({ ...prev, openrouterModelId: modelId }));
+    setSettings(prev => updateModelId(prev, modelId));
   };
 
   const validateCurrentKey = async (provider: AIProvider) => {
@@ -161,6 +163,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const currentValidation = validationResult[activeProvider];
 
   // Model selection options
+  const activeModelId = getActiveModelId(settings);
+
   const modelOptions = activeProvider === 'openrouter'
     ? openrouterModels
     : GEMINI_MODELS.map(m => ({ id: m.id, name: m.name, description: m.description }));
@@ -417,7 +421,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <label
                   key={model.id}
                   className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                    settings.openrouterModelId === model.id
+                    activeModelId === model.id
                       ? 'border-emerald-500 bg-emerald-50'
                       : 'border-slate-200 hover:border-slate-300 bg-white'
                   }`}
@@ -426,7 +430,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     type="radio"
                     name="model"
                     value={model.id}
-                    checked={settings.openrouterModelId === model.id}
+                    checked={activeModelId === model.id}
                     onChange={(e) => handleModelChange(e.target.value)}
                     className="mt-1 w-4 h-4 text-emerald-600 border-slate-300 focus:ring-emerald-500"
                   />

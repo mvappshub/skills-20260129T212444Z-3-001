@@ -61,9 +61,21 @@ const MODELS_CACHE_KEY = 'silvaplan_openrouter_models';
 const MODELS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Environment variables - loaded from .env.local (ignored in tests)
-const IS_TEST_ENV = import.meta.env.MODE === 'test';
-const ENV_OPENROUTER_API_KEY = IS_TEST_ENV ? '' : (import.meta.env.VITE_OPENROUTER_API_KEY || '');
-const ENV_GEMINI_API_KEY = IS_TEST_ENV ? '' : (import.meta.env.GEMINI_API_KEY || '');
+export function resolveEnvApiKeys(env: ImportMetaEnv = import.meta.env): {
+  openrouterApiKey: string;
+  geminiApiKey: string;
+} {
+  if (env.MODE === 'test') {
+    return { openrouterApiKey: '', geminiApiKey: '' };
+  }
+
+  return {
+    openrouterApiKey: env.VITE_OPENROUTER_API_KEY || '',
+    geminiApiKey: env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || ''
+  };
+}
+
+const { openrouterApiKey: ENV_OPENROUTER_API_KEY, geminiApiKey: ENV_GEMINI_API_KEY } = resolveEnvApiKeys();
 
 const DEFAULT_SETTINGS: AISettings = {
   provider: 'openrouter',
@@ -362,6 +374,19 @@ export async function getToolCompatibleModels(): Promise<OpenRouterModel[]> {
 // ============================================================================
 // Provider & Model Selection
 // ============================================================================
+
+export function getActiveModelId(settings: AISettings): string {
+  return settings.provider === 'openrouter'
+    ? settings.openrouterModelId
+    : settings.geminiModelId;
+}
+
+export function updateModelId(settings: AISettings, modelId: string): AISettings {
+  if (settings.provider === 'openrouter') {
+    return { ...settings, openrouterModelId: modelId };
+  }
+  return { ...settings, geminiModelId: modelId };
+}
 
 /**
  * Get current provider and model info

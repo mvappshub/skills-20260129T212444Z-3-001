@@ -38,6 +38,23 @@ export interface CreateNotificationInput {
 }
 
 // ============================================================================
+// Date helpers
+// ============================================================================
+
+export const EVENT_DATE_COLUMN = 'start_at';
+
+export function getDayRangeIso(date: Date): { startAt: string; endAt: string } {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return {
+        startAt: start.toISOString(),
+        endAt: end.toISOString()
+    };
+}
+
+// ============================================================================
 // Notification CRUD
 // ============================================================================
 
@@ -180,13 +197,15 @@ export async function checkWeatherAlerts(): Promise<Notification[]> {
         // Get upcoming events (next 7 days)
         const now = new Date();
         const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const { startAt: nowStartAt } = getDayRangeIso(now);
+        const { endAt: weekEndAt } = getDayRangeIso(weekFromNow);
 
         const { data: events, error } = await supabase
             .from('events')
             .select('*')
             .eq('status', 'planned')
-            .gte('date', now.toISOString().split('T')[0])
-            .lte('date', weekFromNow.toISOString().split('T')[0]);
+            .gte(EVENT_DATE_COLUMN, nowStartAt)
+            .lt(EVENT_DATE_COLUMN, weekEndAt);
 
         if (error || !events?.length) return createdAlerts;
 
@@ -195,7 +214,7 @@ export async function checkWeatherAlerts(): Promise<Notification[]> {
         const weatherData = await fetchWeatherForecast(50.0755, 14.4378, 7);
 
         for (const event of events) {
-            const eventDate = new Date(event.date);
+            const eventDate = new Date(event.start_at);
             const dayIndex = Math.floor((eventDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
 
             if (dayIndex < 0 || dayIndex >= weatherData.length) continue;
@@ -258,13 +277,14 @@ export async function createEventReminders(): Promise<Notification[]> {
         // Get events happening tomorrow
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        const { startAt: tomorrowStartAt, endAt: tomorrowEndAt } = getDayRangeIso(tomorrow);
 
         const { data: events, error } = await supabase
             .from('events')
             .select('*')
             .eq('status', 'planned')
-            .eq('date', tomorrowStr);
+            .gte(EVENT_DATE_COLUMN, tomorrowStartAt)
+            .lt(EVENT_DATE_COLUMN, tomorrowEndAt);
 
         if (error || !events?.length) return createdReminders;
 

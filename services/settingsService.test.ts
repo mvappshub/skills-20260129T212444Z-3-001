@@ -5,6 +5,9 @@ import {
     saveSettings,
     validateApiKey,
     isConfigured,
+    resolveEnvApiKeys,
+    getActiveModelId,
+    updateModelId,
     type AISettings,
 } from './settingsService';
 
@@ -34,6 +37,17 @@ describe('settingsService', () => {
             expect(settings.provider).toBe('openrouter');
             expect(settings.openrouterApiKey).toBe('');
             expect(settings.geminiApiKey).toBe('');
+        });
+
+        it('uses VITE_ env keys when provided', () => {
+            const resolved = resolveEnvApiKeys({
+                MODE: 'development',
+                VITE_OPENROUTER_API_KEY: 'sk-or-v1-test',
+                VITE_GEMINI_API_KEY: 'AIzaSyTestKeyFromVite',
+            } as any);
+
+            expect(resolved.openrouterApiKey).toBe('sk-or-v1-test');
+            expect(resolved.geminiApiKey).toBe('AIzaSyTestKeyFromVite');
         });
 
         it('returns stored settings from localStorage', () => {
@@ -106,6 +120,51 @@ describe('settingsService', () => {
             saveSettings(settings);
 
             expect(isConfigured()).toBe(true);
+        });
+    });
+
+    describe('model selection helpers', () => {
+        it('returns active model id based on provider', () => {
+            const settings: AISettings = {
+                provider: 'gemini',
+                openrouterApiKey: '',
+                geminiApiKey: '',
+                openrouterModelId: 'openrouter-model',
+                geminiModelId: 'gemini-model',
+                streamResponses: false,
+                maxHistoryMessages: 50,
+                defaultLat: 50.0755,
+                defaultLng: 14.4378,
+                defaultLocationName: 'Praha'
+            };
+
+            expect(getActiveModelId(settings)).toBe('gemini-model');
+
+            settings.provider = 'openrouter';
+            expect(getActiveModelId(settings)).toBe('openrouter-model');
+        });
+
+        it('updates the correct model id field', () => {
+            const settings: AISettings = {
+                provider: 'gemini',
+                openrouterApiKey: '',
+                geminiApiKey: '',
+                openrouterModelId: 'openrouter-model',
+                geminiModelId: 'gemini-model',
+                streamResponses: false,
+                maxHistoryMessages: 50,
+                defaultLat: 50.0755,
+                defaultLng: 14.4378,
+                defaultLocationName: 'Praha'
+            };
+
+            const updatedGemini = updateModelId(settings, 'gemini-new');
+            expect(updatedGemini.geminiModelId).toBe('gemini-new');
+            expect(updatedGemini.openrouterModelId).toBe('openrouter-model');
+
+            const updatedOpenRouter = updateModelId({ ...settings, provider: 'openrouter' }, 'openrouter-new');
+            expect(updatedOpenRouter.openrouterModelId).toBe('openrouter-new');
+            expect(updatedOpenRouter.geminiModelId).toBe('gemini-model');
         });
     });
 });

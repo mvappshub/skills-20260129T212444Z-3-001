@@ -1,5 +1,32 @@
 import { supabase } from '../lib/supabase'
 import { CalendarEvent, EventType, EventStatus } from '../types'
+import { assertValidLngLat, isValidLatitude, isValidLongitude } from './geo'
+
+export type EventUpdateInput = Partial<Omit<CalendarEvent, 'id' | 'items'>> & {
+    end_at?: Date | null;
+    start_at?: Date | null;
+};
+
+export function buildEventUpdatePayload(updates: EventUpdateInput): Record<string, any> {
+    const updateData: Record<string, any> = {};
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'title')) updateData.title = updates.title;
+    if (Object.prototype.hasOwnProperty.call(updates, 'type')) updateData.type = updates.type;
+    if (Object.prototype.hasOwnProperty.call(updates, 'status')) updateData.status = updates.status;
+    if (Object.prototype.hasOwnProperty.call(updates, 'start_at')) {
+        updateData.start_at = updates.start_at ? updates.start_at.toISOString() : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'end_at')) {
+        updateData.end_at = updates.end_at ? updates.end_at.toISOString() : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'lat')) updateData.lat = updates.lat;
+    if (Object.prototype.hasOwnProperty.call(updates, 'lng')) updateData.lng = updates.lng;
+    if (Object.prototype.hasOwnProperty.call(updates, 'radius_m')) updateData.radius_m = updates.radius_m;
+    if (Object.prototype.hasOwnProperty.call(updates, 'address')) updateData.address = updates.address;
+    if (Object.prototype.hasOwnProperty.call(updates, 'notes')) updateData.notes = updates.notes;
+
+    return updateData;
+}
 
 export async function fetchEvents(): Promise<CalendarEvent[]> {
     const { data: events, error } = await supabase
@@ -35,6 +62,7 @@ export async function fetchEvents(): Promise<CalendarEvent[]> {
 
 export async function createEvent(event: Omit<CalendarEvent, 'id'>): Promise<CalendarEvent> {
     const { items, ...eventData } = event
+    assertValidLngLat(eventData.lat, eventData.lng, 'event')
 
     const { data: newEvent, error: eventError } = await supabase
         .from('events')
@@ -66,7 +94,13 @@ export async function createEvent(event: Omit<CalendarEvent, 'id'>): Promise<Cal
                 size_class: item.size_class
             })))
 
-        if (itemsError) throw itemsError
+        if (itemsError) {
+            await supabase
+                .from('events')
+                .delete()
+                .eq('id', newEvent.id);
+            throw itemsError
+        }
     }
 
     return {
@@ -78,20 +112,15 @@ export async function createEvent(event: Omit<CalendarEvent, 'id'>): Promise<Cal
 
 export async function updateEvent(
     id: string,
-    updates: Partial<Omit<CalendarEvent, 'id' | 'items'>>
+    updates: EventUpdateInput
 ): Promise<CalendarEvent> {
-    const updateData: Record<string, any> = {};
-
-    if (updates.title) updateData.title = updates.title;
-    if (updates.type) updateData.type = updates.type;
-    if (updates.status) updateData.status = updates.status;
-    if (updates.start_at) updateData.start_at = updates.start_at.toISOString();
-    if (updates.end_at) updateData.end_at = updates.end_at.toISOString();
-    if (updates.lat !== undefined) updateData.lat = updates.lat;
-    if (updates.lng !== undefined) updateData.lng = updates.lng;
-    if (updates.radius_m !== undefined) updateData.radius_m = updates.radius_m;
-    if (updates.address !== undefined) updateData.address = updates.address;
-    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    if (updates.lat !== undefined && !isValidLatitude(updates.lat)) {
+        throw new Error('Invalid event coordinates')
+    }
+    if (updates.lng !== undefined && !isValidLongitude(updates.lng)) {
+        throw new Error('Invalid event coordinates')
+    }
+    const updateData = buildEventUpdatePayload(updates);
 
     const { data, error } = await supabase
         .from('events')

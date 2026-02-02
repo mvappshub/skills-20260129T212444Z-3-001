@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { TreeRecord } from '../types'
+import { assertValidLngLat } from './geo'
 
 export async function fetchTrees(): Promise<TreeRecord[]> {
     const { data, error } = await supabase
@@ -30,6 +31,7 @@ export async function fetchTrees(): Promise<TreeRecord[]> {
 }
 
 export async function createTree(tree: Omit<TreeRecord, 'id' | 'photos'>): Promise<TreeRecord> {
+    assertValidLngLat(tree.lat, tree.lng, 'tree')
     const { data, error } = await supabase
         .from('trees')
         .insert({

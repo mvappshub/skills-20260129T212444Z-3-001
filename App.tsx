@@ -34,6 +34,7 @@ import {
   WeatherForecast
 } from './services/weatherService';
 import { CalendarEvent, TreeRecord, MeteoAlert, EventType, AlertLevel } from './types';
+import { debugLog } from './services/debug';
 
 type ViewMode = 'calendar' | 'map';
 

@@ -2,7 +2,16 @@ import React, { useRef, useEffect, useState, useMemo } from 'react'
 import Map, { MapRef, Marker, Popup, NavigationControl, FullscreenControl } from 'react-map-gl/maplibre'
 import { Navigation, X } from 'lucide-react'
 import { CalendarEvent, TreeRecord } from '../types'
+import { isValidLngLat, filterValidMapPoints as filterItems } from '../services/geo'
 import 'maplibre-gl/dist/maplibre-gl.css'
+
+export { isValidLngLat } from '../services/geo'
+export function filterValidMapPoints(events: CalendarEvent[], trees: TreeRecord[]) {
+  return {
+    events: filterItems(events),
+    trees: filterItems(trees)
+  }
+}
 
 interface MapCanvasProps {
   events: CalendarEvent[]
@@ -35,6 +44,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   onBoundsReady,
   onCancelPick,
 }) => {
+  const { events: validEvents, trees: validTrees } = useMemo(() => filterValidMapPoints(events, trees), [events, trees])
   const mapRef = useRef<MapRef>(null)
   const [viewState, setViewState] = useState({
     longitude: centerLng,
@@ -46,20 +56,22 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   // Handle focus location changes
   useEffect(() => {
     if (focusLocation) {
-      setViewState({
-        longitude: focusLocation.lng,
-        latitude: focusLocation.lat,
-        zoom: focusLocation.zoom || 14,
-      })
+      if (isValidLngLat(focusLocation.lat, focusLocation.lng)) {
+        setViewState({
+          longitude: focusLocation.lng,
+          latitude: focusLocation.lat,
+          zoom: focusLocation.zoom || 14,
+        })
+      }
     }
   }, [focusLocation])
 
   // Fit bounds when data changes
   useEffect(() => {
-    if (mapRef.current && (events.length > 0 || trees.length > 0)) {
+    if (mapRef.current && (validEvents.length > 0 || validTrees.length > 0)) {
       const allPoints: [number, number][] = [
-        ...events.map(e => [e.lng, e.lat] as [number, number]),
-        ...trees.map(t => [t.lng, t.lat] as [number, number]),
+        ...validEvents.map(e => [e.lng, e.lat] as [number, number]),
+        ...validTrees.map(t => [t.lng, t.lat] as [number, number]),
       ]
 
       if (allPoints.length > 0) {
@@ -74,7 +86,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         )
       }
     }
-  }, [events, trees])
+  }, [validEvents, validTrees])
 
   const handleClick = (e: any) => {
     if (isPickingLocation && onMapClick) {
@@ -85,10 +97,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   // Combine markers (kept for potential clustering use)
   useMemo(() => {
     return [
-      ...events.map(e => ({ id: e.id, lng: e.lng, lat: e.lat })),
-      ...trees.map(t => ({ id: t.id, lng: t.lng, lat: t.lat })),
+      ...validEvents.map(e => ({ id: e.id, lng: e.lng, lat: e.lat })),
+      ...validTrees.map(t => ({ id: t.id, lng: t.lng, lat: t.lat })),
     ]
-  }, [events, trees])
+  }, [validEvents, validTrees])
 
   return (
     <div className={`relative ${className || ''} ${isPickingLocation ? 'cursor-crosshair' : ''}`}>
@@ -106,7 +118,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         <FullscreenControl position="top-right" />
 
         {/* Event markers */}
-        {events.map((event) => (
+        {validEvents.map((event) => (
           <Marker
             key={event.id}
             longitude={event.lng}
@@ -129,7 +141,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
         {/* Event popup with address */}
         {popupEventId && (() => {
-          const ev = events.find(e => e.id === popupEventId)
+          const ev = validEvents.find(e => e.id === popupEventId)
           if (!ev) return null
           return (
             <Popup
@@ -156,7 +168,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         })()}
 
         {/* Tree markers */}
-        {trees.map((tree) => (
+        {validTrees.map((tree) => (
           <Marker
             key={tree.id}
             longitude={tree.lng}
@@ -177,7 +189,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         ))}
 
         {/* Temp pin */}
-        {tempPinLocation && (
+        {tempPinLocation && isValidLngLat(tempPinLocation.lat, tempPinLocation.lng) && (
           <Marker
             longitude={tempPinLocation.lng}
             latitude={tempPinLocation.lat}
