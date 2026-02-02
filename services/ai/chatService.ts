@@ -24,14 +24,9 @@ import {
   type OpenRouterModel,
   GEMINI_MODELS
 } from '../settingsService';
+import { resolveEventLocation } from './eventLocation';
 
-// Debug logging - ALWAYS ON for debugging
-const DEBUG = true;
-const debugLog = (...args: any[]) => {
-  if (DEBUG) {
-    console.warn('[🌲 SilvaPlan AI]', ...args);
-  }
-};
+import { debugLog } from '../debug';
 
 // ============================================================================
 // Types
@@ -293,6 +288,7 @@ function getSpeciesConditions(species: string) {
   return SPECIES_CONDITIONS[normalized] || DEFAULT_SPECIES_CONDITIONS;
 }
 
+
 const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
   async createEvent(args) {
     try {
@@ -301,22 +297,25 @@ const toolHandlers: Record<ToolName, (args: any) => Promise<any>> = {
 
       // Default to 'planting' if type not provided by AI
       const eventType = (args.type as EventType) || EventType.PLANTING;
-      const defaultLoc = getDefaultLocation();
+      const resolved = await resolveEventLocation({ lat: args.lat, lng: args.lng, address: args.address });
 
-      const finalLat = args.lat || defaultLoc.lat;
-      const finalLng = args.lng || defaultLoc.lng;
-
-      console.warn('🔧 [createEvent] DEFAULT LOC:', defaultLoc);
-      console.warn('🔧 [createEvent] FINAL LAT/LNG:', finalLat, finalLng);
-      console.warn('🔧 [createEvent] USING DEFAULT?:', !args.lat || !args.lng);
-
+      if (!resolved) {
+        const hasAddress = typeof args.address === 'string' && args.address.trim().length > 0;
+        return {
+          success: false,
+          error: "Chybi lokace",
+          message: hasAddress
+            ? "Nepodarilo se dohledat souradnice pro adresu \"" + args.address + "\"."
+            : "Nejdriv prosim vyberte lokaci na mape nebo pouzijte GPS, pak akci vytvorim."
+        };
+      }
       const event = await createEvent({
         title: args.title,
         type: eventType,
         status: EventStatus.PLANNED,
         start_at: parseISO(args.date),
-        lat: finalLat,
-        lng: finalLng,
+        lat: resolved.lat,
+        lng: resolved.lng,
         address: args.address,
         notes: args.notes,
         items: (args.items || []).map((item: any) => ({
@@ -795,8 +794,8 @@ TVOJE SCHOPNOSTI:
 
 KRITICKÁ PRAVIDLA PRO LOKACI:
 - PŘED vytvořením jakékoliv akce VŽDY nejprve zavolej getMapContext
-- Pokud getMapContext vrátí lokaci, POUŽIJ JI v createEvent (lat, lng parametry)
-- Pokud getMapContext nevrátí lokaci, ZEPTEJ SE uživatele kde chce akci naplánovat
+- Pokud getMapContext nevrati lokaci, pouzij adresu z uzivatelskeho vstupu a nech ji geokodovat.
+- Pokud getMapContext nevrati lokaci, pouzij adresu z uzivatelskeho vstupu a nech ji geokodovat.
 - NIKDY nevytvářej akci bez ověření lokace přes getMapContext
 
 DŮLEŽITÉ PRAVIDLA PRO PRÁCI S DOKUMENTY:
@@ -813,7 +812,7 @@ PRAVIDLA PRO VYTVÁŘENÍ AKCÍ:
 POSTUP PŘI PLÁNOVÁNÍ VÝSADBY:
 1. Zavolej getMapContext - zjisti dostupnou lokaci
 2. Pokud lokace existuje, vytvoř akce s touto lokací
-3. Pokud lokace neexistuje, zeptej se uživatele nebo nabídni výchozí lokaci
+3. Pokud lokace neexistuje, pouzij adresu a nech ji geokodovat
 
 LATINSKÉ NÁZVY BĚŽNÝCH DRUHŮ:
 - Dub letní = Quercus robur, Dub zimní = Quercus petraea

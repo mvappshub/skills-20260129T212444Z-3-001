@@ -35,6 +35,7 @@ export interface CalendarEvent {
   end_at?: Date;
   lat: number;
   lng: number;
+  address?: string; // Human-readable location name
   radius_m?: number;
   notes?: string;
   items: EventItem[]; // Joined from event_items

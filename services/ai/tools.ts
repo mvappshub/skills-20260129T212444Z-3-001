@@ -6,8 +6,8 @@ export const createEventSchema = z.object({
   title: z.string().describe('Název akce, např. "Výsadba dubů v parku"'),
   type: z.enum(['planting', 'maintenance', 'other']).default('planting').describe('Typ akce (výchozí: planting)'),
   date: z.string().describe('Datum ve formátu YYYY-MM-DD'),
-  lat: z.number().describe('Zeměpisná šířka lokace'),
-  lng: z.number().describe('Zeměpisná délka lokace'),
+  lat: z.number().optional().describe('Zemepisna sirka lokace (volitelne pokud je adresa)'),
+  lng: z.number().optional().describe('Zemepisna delka lokace (volitelne pokud je adresa)'),
   address: z.string().optional().describe('Lidsky čitelná adresa nebo název místa, např. "Volarská 548/26, Praha 4"'),
   notes: z.string().optional().describe('Poznámky k akci'),
   items: z.array(z.object({
@@ -95,7 +95,7 @@ export const getMapContextSchema = z.object({});
 // Tool definitions pro AI SDK
 export const toolDefinitions = {
   createEvent: {
-    description: 'Vytvořit novou plánovanou akci (výsadba, údržba stromů). PŘED voláním VŽDY nejprve zavolej getMapContext pro zjištění lokace.',
+    description: 'Vytvorit novou planovanou akci (vysadba, udrzba stromu). PRED volanim VZDY nejprve zavolej getMapContext pro zjisteni lokace. Pokud neni dostupna lokace, pouzij adresu a nech ji geokodovat.',
     parameters: createEventSchema
   },
   editEvent: {
