@@ -237,31 +237,28 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
           <div className="flex gap-2">
             <button
               onClick={() => setFilter('all')}
-              className={`flex-1 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                filter === 'all'
+              className={`flex-1 px-3 py-1.5 rounded text-sm font-medium transition-colors ${filter === 'all'
                   ? 'bg-slate-800 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               Vše
             </button>
             <button
               onClick={() => setFilter('trees')}
-              className={`flex-1 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                filter === 'trees'
+              className={`flex-1 px-3 py-1.5 rounded text-sm font-medium transition-colors ${filter === 'trees'
                   ? 'bg-emerald-600 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               Stromy
             </button>
             <button
               onClick={() => setFilter('events')}
-              className={`flex-1 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                filter === 'events'
+              className={`flex-1 px-3 py-1.5 rounded text-sm font-medium transition-colors ${filter === 'events'
                   ? 'bg-blue-600 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               Akce
             </button>
@@ -270,7 +267,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-24">
         {selectedTree ? (
           // Tree Detail View
           <div className="p-4 space-y-6">
@@ -376,66 +373,65 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
           // Timeline View
           <div className="p-4 space-y-4">
             {Array.from(filteredGroups.entries()).map(([dateKey, items]) => {
-          const isExpanded = expandedGroups.has(dateKey)
-          const date = new Date(dateKey)
+              const isExpanded = expandedGroups.has(dateKey)
+              const date = new Date(dateKey)
 
-          return (
-            <div key={dateKey} className="border border-slate-200 rounded-lg overflow-hidden">
-              {/* Date header */}
-              <button
-                onClick={() => toggleGroup(dateKey)}
-                className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100 flex items-center justify-between transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  <CalendarIcon size={16} className="text-slate-400" />
-                  <span className="font-medium text-slate-700">
-                    {format(date, 'd. MMMM yyyy', { locale: cs })}
-                  </span>
-                  {isToday(date) && (
-                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Dnes</span>
+              return (
+                <div key={dateKey} className="border border-slate-200 rounded-lg overflow-hidden">
+                  {/* Date header */}
+                  <button
+                    onClick={() => toggleGroup(dateKey)}
+                    className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100 flex items-center justify-between transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      <CalendarIcon size={16} className="text-slate-400" />
+                      <span className="font-medium text-slate-700">
+                        {format(date, 'd. MMMM yyyy', { locale: cs })}
+                      </span>
+                      {isToday(date) && (
+                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Dnes</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-500">{items.length} položek</span>
+                  </button>
+
+                  {/* Items */}
+                  {isExpanded && (
+                    <div className="divide-y divide-slate-100">
+                      {items.map(item => (
+                        <button
+                          key={`${item.type}-${item.id}`}
+                          onClick={() => handleItemClick(item)}
+                          className="w-full px-3 py-3 hover:bg-slate-50 flex items-start gap-3 transition-colors text-left group"
+                        >
+                          <div className={`p-2 rounded ${item.type === 'tree'
+                              ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-200'
+                              : 'bg-blue-100 text-blue-600 group-hover:bg-blue-200'
+                            } transition-colors`}>
+                            {item.type === 'tree' ? <Leaf size={18} /> : <CalendarIcon size={18} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-slate-800 truncate">{item.title}</div>
+                            <div className="text-sm text-slate-500">{item.subtitle}</div>
+                          </div>
+                          <div className="p-1.5 rounded hover:bg-slate-200 transition-colors" title="Zobrazit na mapě">
+                            <MapPin size={16} className="text-slate-400" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <span className="text-xs text-slate-500">{items.length} položek</span>
-              </button>
+              )
+            })}
 
-              {/* Items */}
-              {isExpanded && (
-                <div className="divide-y divide-slate-100">
-                  {items.map(item => (
-                    <button
-                      key={`${item.type}-${item.id}`}
-                      onClick={() => handleItemClick(item)}
-                      className="w-full px-3 py-3 hover:bg-slate-50 flex items-start gap-3 transition-colors text-left group"
-                    >
-                      <div className={`p-2 rounded ${
-                        item.type === 'tree'
-                          ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-200'
-                          : 'bg-blue-100 text-blue-600 group-hover:bg-blue-200'
-                      } transition-colors`}>
-                        {item.type === 'tree' ? <Leaf size={18} /> : <CalendarIcon size={18} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-slate-800 truncate">{item.title}</div>
-                        <div className="text-sm text-slate-500">{item.subtitle}</div>
-                      </div>
-                      <div className="p-1.5 rounded hover:bg-slate-200 transition-colors" title="Zobrazit na mapě">
-                        <MapPin size={16} className="text-slate-400" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-
-        {filteredGroups.size === 0 && (
-          <div className="text-center py-8 text-slate-400">
-            {filter === 'all' ? 'Žádné záznamy' : filter === 'trees' ? 'Žádné stromy' : 'Žádné akce'}
+            {filteredGroups.size === 0 && (
+              <div className="text-center py-8 text-slate-400">
+                {filter === 'all' ? 'Žádné záznamy' : filter === 'trees' ? 'Žádné stromy' : 'Žádné akce'}
+              </div>
+            )}
           </div>
-        )}
-        </div>
         )}
       </div>
     </div>

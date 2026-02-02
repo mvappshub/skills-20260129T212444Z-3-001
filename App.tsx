@@ -45,9 +45,9 @@ const getDayModifiers = (date: Date, events: CalendarEvent[], trees: TreeRecord[
   const dayAlerts = alerts.filter(a => isWithinInterval(date, { start: a.valid_from, end: a.valid_to }));
 
   return {
-    hasPlan: dayEvents.length > 0,
-    hasRealization: dayTrees.length > 0,
-    hasAlert: dayAlerts.length > 0,
+    eventCount: dayEvents.length,
+    treeCount: dayTrees.length,
+    alertCount: dayAlerts.length,
     alertLevel: dayAlerts.length > 0
       ? dayAlerts.reduce((prev, curr) => curr.level === AlertLevel.DANGER ? AlertLevel.DANGER : prev, AlertLevel.INFO)
       : undefined
@@ -498,7 +498,7 @@ export default function App() {
                     ))}
 
                     {currentDays.map((day) => {
-                      const { hasPlan, hasRealization, hasAlert, alertLevel } = getDayModifiers(day, events, trees, alerts);
+                      const { eventCount, treeCount, alertCount, alertLevel } = getDayModifiers(day, events, trees, alerts);
                       const isSelected = isSameDay(day, selectedDate);
                       const isTodayDate = isToday(day);
 
@@ -517,25 +517,31 @@ export default function App() {
                               {format(day, 'd')}
                             </span>
 
-                            {hasAlert && (
-                              <div className={`p-1 rounded-full ${alertLevel === AlertLevel.DANGER ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
-                                }`} title="Výstraha">
+                            {alertCount > 0 && (
+                              <div
+                                className={`p-1 rounded-full ${alertLevel === AlertLevel.DANGER ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}
+                                title={`${alertCount} výstrah`}
+                              >
                                 <AlertTriangle size={12} />
                               </div>
                             )}
                           </div>
 
                           <div className="mt-2 space-y-1">
-                            {hasPlan && (
+                            {eventCount > 0 && (
                               <div className="flex items-center text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 truncate">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></div>
-                                <span className="truncate">Plán</span>
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 flex-shrink-0"></span>
+                                <span className="truncate font-medium">
+                                  {eventCount === 1 ? '1 akce' : eventCount < 5 ? `${eventCount} akce` : `${eventCount} akcí`}
+                                </span>
                               </div>
                             )}
-                            {hasRealization && (
+                            {treeCount > 0 && (
                               <div className="flex items-center text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 truncate">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></div>
-                                <span className="truncate">Výsadba</span>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 flex-shrink-0"></span>
+                                <span className="truncate font-medium">
+                                  {treeCount} {treeCount === 1 ? 'strom' : treeCount < 5 ? 'stromy' : 'stromů'}
+                                </span>
                               </div>
                             )}
                           </div>
@@ -593,11 +599,15 @@ export default function App() {
 
           {viewMode === 'calendar' && (
             <div className="h-full flex flex-col">
-              <div className="p-4 border-b border-slate-200">
-                <h3 className="font-bold text-slate-800">Detail dne</h3>
-                <p className="text-sm text-slate-500">{format(selectedDate, 'd. MMMM yyyy', { locale: cs })}</p>
+              <div className="p-4 border-b border-slate-200 bg-slate-50">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  {format(selectedDate, 'd. MMMM yyyy', { locale: cs })}
+                  <span className="text-sm font-normal text-slate-500 inline-block ml-2 capitalize">
+                    {format(selectedDate, 'EEEE', { locale: cs })}
+                  </span>
+                </h3>
               </div>
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto pb-24">
                 <DayDetailPanel
                   date={selectedDate}
                   events={selectedDayData.events}
@@ -635,7 +645,7 @@ export default function App() {
           viewState: focusLocation,
           pickedLocation: pickedLocation
         };
-        console.warn('🏠 [App.tsx] RENDERING ChatPanel with mapContext:', JSON.stringify(mapContextValue, null, 2));
+        debugLog('🏠 [App.tsx] RENDERING ChatPanel with mapContext:', JSON.stringify(mapContextValue, null, 2));
         return (
           <ChatPanel
             isOpen={isChatOpen}

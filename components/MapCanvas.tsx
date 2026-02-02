@@ -209,11 +209,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg shadow-lg p-3 text-xs">
         <div className="flex items-center gap-2 mb-1">
           <div className="w-3 h-3 rounded-full bg-blue-500" />
-          <span>Plánované akce ({events.length})</span>
+          <span>PlÃ¡novanÃ© akce ({events.length})</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-emerald-500" />
-          <span>Vysazené stromy ({trees.length})</span>
+          <span>VysazenÃ© stromy ({trees.length})</span>
         </div>
       </div>
 
@@ -221,7 +221,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       {isPickingLocation && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
           <Navigation size={16} />
-          <span className="font-medium">Kliknìte na mapu pro výbìr místa</span>
+          <span className="font-medium">KliknÄ›te na mapu pro vÃ½bÄ›r mÃ­sta</span>
           <button
             onClick={(e) => {
               e.stopPropagation()

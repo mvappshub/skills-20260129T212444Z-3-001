@@ -18,19 +18,28 @@ import { logAgentAction, deleteConversation } from '../services/conversationServ
 import { isImageFile, isDocumentFile, isTextReadable, fileToBase64, fileToText, isAllowedFileType, getFileExtension } from '../services/fileUploadService';
 import { extractTextFromPDF, isPDF } from '../services/pdfService';
 import { extractTextFromDocx, isDocx, isDoc } from '../services/docxService';
+import { globalMapContext } from '../services/ai/mapContext';
+import { debugLog } from '../services/debug';
+
+interface MapContextProp {
+  viewState?: { lat: number; lng: number; zoom?: number } | null;
+  pickedLocation?: { lat: number; lng: number } | null;
+}
 
 interface ChatPanelProps {
   onEventCreated?: () => void;
   isOpen: boolean;
   onClose: () => void;
   onOpenSettings?: () => void;
+  mapContext?: MapContextProp;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
   onEventCreated,
   isOpen,
   onClose,
-  onOpenSettings
+  onOpenSettings,
+  mapContext
 }) => {
   // Conversation persistence hook
   const {
@@ -80,6 +89,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     window.addEventListener('aisettings-changed', handleSettingsChange);
     return () => window.removeEventListener('aisettings-changed', handleSettingsChange);
   }, []);
+
+  // Sync map context with globalMapContext bridge for AI tools
+  useEffect(() => {
+    debugLog('📍 [ChatPanel] MAP CONTEXT PROP CHANGED:', JSON.stringify(mapContext, null, 2));
+    if (mapContext) {
+      const contextToSet = {
+        currentView: mapContext.viewState ? {
+          lat: mapContext.viewState.lat,
+          lng: mapContext.viewState.lng,
+          zoom: mapContext.viewState.zoom || 12
+        } : null,
+        pickedLocation: mapContext.pickedLocation || null
+      };
+      debugLog('📍 [ChatPanel] SETTING GLOBAL MAP CONTEXT:', JSON.stringify(contextToSet, null, 2));
+      globalMapContext.setContext(contextToSet);
+    } else {
+      debugLog('📍 [ChatPanel] mapContext is null/undefined');
+    }
+  }, [mapContext]);
 
   const handleOpenSettings = () => {
     setShowSettings(true);

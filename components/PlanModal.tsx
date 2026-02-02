@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { EventType, EventStatus, CalendarEvent } from '../types';
+import { EventType, CalendarEvent } from '../types';
 import { X, MapPin, Calendar as CalendarIcon, Leaf, Pickaxe, Save, Navigation, Loader2 } from 'lucide-react';
 import { useGeolocation } from '../hooks/useGeolocation';
+import { buildPlanEvent } from '../services/planEvent';
 
 interface PlanModalProps {
   isOpen: boolean;
@@ -56,26 +57,25 @@ export const PlanModal: React.FC<PlanModalProps> = ({
     }
   }, [latitude, longitude, onSetLocation]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newEvent: Partial<CalendarEvent> = {
-      title,
-      type,
-      status: EventStatus.PLANNED,
-      start_at: new Date(date),
-      lat: pickedLocation?.lat || 50.08, // Fallback default
-      lng: pickedLocation?.lng || 14.43,
-      address: address || undefined,
-      notes,
-      items: type === EventType.PLANTING ? [
-        {
-          id: Math.random().toString(36).substr(2, 9),
-          species_name_latin: species || 'NeurËeno',
-          quantity: Number(quantity)
-        }
-      ] : []
-    };
+    let newEvent: Partial<CalendarEvent>;
+    try {
+      newEvent = buildPlanEvent({
+        title,
+        type,
+        date,
+        pickedLocation,
+        address,
+        notes,
+        species,
+        quantity
+      });
+    } catch (err) {
+      alert('Vyberte prosim platne misto na mape.');
+      return;
+    }
 
     onSave(newEvent);
     // Reset fields
@@ -98,7 +98,7 @@ export const PlanModal: React.FC<PlanModalProps> = ({
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             {type === EventType.PLANTING ? <Leaf className="text-emerald-600" /> : <Pickaxe className="text-amber-600" />}
-            Nov· akce
+            Nov√° akce
           </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <X size={24} />
@@ -118,7 +118,7 @@ export const PlanModal: React.FC<PlanModalProps> = ({
                 : 'border-slate-200 hover:border-emerald-200 text-slate-600'
                 }`}
             >
-              V˝sadba
+              V√Ωsadba
             </button>
             <button
               type="button"
@@ -128,20 +128,20 @@ export const PlanModal: React.FC<PlanModalProps> = ({
                 : 'border-slate-200 hover:border-amber-200 text-slate-600'
                 }`}
             >
-              ⁄drûba
+              √ödr≈æba
             </button>
           </div>
 
           {/* Basic Info */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">N·zev akce</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">N√°zev akce</label>
               <input
                 required
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder={type === EventType.PLANTING ? "Nap¯. Alej svobody" : "Nap¯. Z·livka strom˘"}
+                placeholder={type === EventType.PLANTING ? "Nap≈ô. Alej svobody" : "Nap≈ô. Z√°livka strom≈Ø"}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
               />
             </div>
@@ -161,21 +161,21 @@ export const PlanModal: React.FC<PlanModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Adresa / popis mÌsta</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Adresa / popis m√≠sta</label>
               <input
                 type="text"
-                value={isGeocoding ? 'NaËÌt·m adresu...' : (address || '')}
-                placeholder="Adresa se doplnÌ automaticky podle mapy"
+                value={isGeocoding ? 'Naƒç√≠t√°m adresu...' : (address || '')}
+                placeholder="Adresa se dopln√≠ automaticky podle mapy"
                 disabled
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100 text-slate-700 focus:outline-none"
               />
-              <p className="text-xs text-slate-500 mt-1">Adresa se doplÚuje automaticky podle zvolenÈho mÌsta.</p>
+              <p className="text-xs text-slate-500 mt-1">Adresa se dopl≈àuje automaticky podle zvolen√©ho m√≠sta.</p>
             </div>
           </div>
 
           {/* Location Picker */}
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-            <label className="block text-sm font-medium text-slate-700 mb-2">MÌsto kon·nÌ</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">M√≠sto kon√°n√≠</label>
             <div className="flex flex-col gap-3">
               <div className="text-sm text-slate-600">
                 {pickedLocation ? (
@@ -183,7 +183,7 @@ export const PlanModal: React.FC<PlanModalProps> = ({
                     {pickedLocation.lat.toFixed(5)}, {pickedLocation.lng.toFixed(5)}
                   </span>
                 ) : (
-                  <span className="text-slate-400 italic">Lokace nevybr·na</span>
+                  <span className="text-slate-400 italic">Lokace nevybr√°na</span>
                 )}
               </div>
               <div className="flex gap-2 flex-wrap">
@@ -193,7 +193,7 @@ export const PlanModal: React.FC<PlanModalProps> = ({
                   className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 shadow-sm rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
                 >
                   <MapPin size={16} />
-                  {pickedLocation ? 'ZmÏnit na mapÏ' : 'Vybrat na mapÏ'}
+                  {pickedLocation ? 'Zmƒõnit na mapƒõ' : 'Vybrat na mapƒõ'}
                 </button>
                 <button
                   type="button"
@@ -204,7 +204,7 @@ export const PlanModal: React.FC<PlanModalProps> = ({
                   className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-300 shadow-sm rounded-md text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                 >
                   {geoLoading ? <Loader2 size={16} className="animate-spin" /> : <Navigation size={16} />}
-                  {geoLoading ? 'NaËÌt·m...' : 'Moje poloha'}
+                  {geoLoading ? 'Naƒç√≠t√°m...' : 'Moje poloha'}
                 </button>
               </div>
               {geoError && (
@@ -216,20 +216,20 @@ export const PlanModal: React.FC<PlanModalProps> = ({
           {/* Conditional Fields: Planting */}
           {type === EventType.PLANTING && (
             <div className="space-y-4 border-t border-slate-100 pt-4">
-              <h3 className="font-medium text-slate-900">Co budeme s·zet?</h3>
+              <h3 className="font-medium text-slate-900">Co budeme s√°zet?</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-slate-500 mb-1">D¯evina (Latinsk˝ n·zev)</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">D≈ôevina (Latinsk√Ω n√°zev)</label>
                   <input
                     type="text"
                     value={species}
                     onChange={(e) => setSpecies(e.target.value)}
-                    placeholder="Nap¯. Tilia cordata"
+                    placeholder="Nap≈ô. Tilia cordata"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">PoËet (ks)</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Poƒçet (ks)</label>
                   <input
                     type="number"
                     min="1"
@@ -246,12 +246,12 @@ export const PlanModal: React.FC<PlanModalProps> = ({
           {type === EventType.MAINTENANCE && (
             <div className="space-y-4 border-t border-slate-100 pt-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Pozn·mka k ˙drûbÏ</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Pozn√°mka k √∫dr≈æbƒõ</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
-                  placeholder="Popis Ëinnosti..."
+                  placeholder="Popis ƒçinnosti..."
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
                 />
               </div>
@@ -265,7 +265,7 @@ export const PlanModal: React.FC<PlanModalProps> = ({
               onClick={onClose}
               className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
             >
-              Zruöit
+              Zru≈°it
             </button>
             <button
               type="submit"
@@ -276,14 +276,14 @@ export const PlanModal: React.FC<PlanModalProps> = ({
                 }`}
             >
               <Save size={18} />
-              Uloûit akci
+              Ulo≈æit akci
             </button>
           </div>
           {!isLocationSelected && (
-            <p className="text-xs text-amber-600">Vyberte mÌsto na mapÏ nebo pouûijte GPS.</p>
+            <p className="text-xs text-amber-600">Vyberte m√≠sto na mapƒõ nebo pou≈æijte GPS.</p>
           )}
           {isGeocoding && (
-            <p className="text-xs text-slate-500">NaËÌt·m adresu, prosÌm poËkejte...</p>
+            <p className="text-xs text-slate-500">Naƒç√≠t√°m adresu, pros√≠m poƒçkejte...</p>
           )}
         </form>
 
